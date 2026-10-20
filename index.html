@@ -7,8 +7,8 @@
 <meta name="theme-color" content="#151b23">
 <meta name="description" content="Личный дневник трейдера: сделки cTrader, аналитика, журнал дня">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -43,7 +43,19 @@ a{color:var(--acc2)}
 .nav button.on{background:var(--acc);color:#fff}
 .nav .ic{width:16px;text-align:center;font-size:14px}
 .sidefoot{padding:12px;border-top:1px solid var(--line);font-size:11px;color:var(--tx3)}
-.main{flex:1;min-width:0;padding:22px 26px 60px;max-width:1500px}
+.main{flex:1;min-width:0;padding:22px 26px 60px}
+/* широкие и очень широкие мониторы: занимаем весь экран, чуть крупнее шрифт и отступы */
+@media(min-width:1700px){
+  .side{width:230px;flex-basis:230px}
+  .main{padding:26px 34px 60px}
+  .modal{max-width:min(1100px,92vw)}
+}
+@media(min-width:2200px){
+  body{font-size:15px}
+  .side{width:250px;flex-basis:250px}
+  .main{padding:30px 44px 70px}
+  h1{font-size:22px}
+}
 .page{display:none}.page.on{display:block}
 h1{font-size:20px;font-weight:600;margin-bottom:2px}
 .sub{color:var(--tx3);font-size:12.5px;margin-bottom:18px}
@@ -962,7 +974,7 @@ canvas{cursor:crosshair}
 
 <!-- ======== DAY MODAL ======== -->
 <div class="mask" id="jMask">
-  <div class="modal" style="max-width:1240px">
+  <div class="modal" style="max-width:min(1600px,96vw)">
     <div class="mhead"><b id="jTitle">День</b><button class="x" onclick="closeDay()">×</button></div>
     <div class="mbody">
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
