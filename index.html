@@ -405,6 +405,12 @@ canvas{cursor:crosshair}
 .xltabs button.on{background:#fff;color:#188038;font-weight:600;box-shadow:inset 0 -3px 0 #188038}
 .xlload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#666;font-size:14px;background:#fff}
 .kbicon.gs{background:rgba(24,128,56,.18);color:#34a853;font-size:18px}
+.accpick{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px}
+.accpick>span{color:var(--tx3);margin-right:2px}
+.accpick i{width:1px;height:16px;background:var(--line);margin:0 3px}
+.accpick button{padding:4px 10px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--tx2);font-size:12px}
+.accpick button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.jtacc{font-size:9.5px;color:var(--acc2);white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis}
 /* ---------- планшеты и узкие окна ---------- */
 @media(max-width:1100px){
   .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -522,7 +528,7 @@ canvas{cursor:crosshair}
       <button data-p="dash" class="on"><span class="ic">◧</span>Дашборд</button>
       <button data-p="trades"><span class="ic">≡</span>Сделки</button>
       <button data-p="stats"><span class="ic">◨</span>Аналитика</button>
-      <button data-p="journal"><span class="ic">✓</span>Журнал дня</button>
+      <button data-p="journal"><span class="ic">✓</span>Журнал</button>
       <button data-p="circ"><span class="ic">◉</span>Дневник кружков</button>
       <button data-p="bt"><span class="ic">⟲</span>Бэктесты</button>
       <button data-p="kb"><span class="ic">▤</span>База знаний</button>
@@ -791,6 +797,7 @@ canvas{cursor:crosshair}
           <button class="btn" onclick="circToday()">Сегодня</button>
         </div>
       </div>
+      <div id="circAccPick" style="margin:-4px 0 12px"></div>
 
       <div class="chartbox" style="margin-bottom:12px">
         <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:4px">
@@ -907,7 +914,7 @@ canvas{cursor:crosshair}
             <h2 style="margin:0">Мои счета</h2><button class="btn pri sm" onclick="addAcc()">+ Добавить счёт</button>
           </div>
           <div id="accList"></div>
-          <p class="mut" style="font-size:12px;margin-top:10px">У каждого счёта свои сделки, депозит, риск и списки сетапов. Журнал дня — общий. Переключение — в левом меню.</p>
+          <p class="mut" style="font-size:12px;margin-top:10px">У каждого счёта свои сделки, депозит, риск и списки сетапов. Журнал — общий для всех счетов. Переключение — в левом меню.</p>
         </div>
         <div class="card">
           <h2>Активный счёт</h2>
@@ -1089,6 +1096,7 @@ canvas{cursor:crosshair}
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
         <label style="margin:0">Сделки дня</label>
         <div class="row" style="gap:6px">
+          <span id="jAccPick"></span>
           <span class="mut" id="jtSrc" style="font-size:11.5px"></span>
           <button class="btn sm" onclick="pullTrades()">↧ Из cTrader</button>
           <button class="btn sm" onclick="addJTrade()">+ вход</button>
@@ -1316,8 +1324,54 @@ function load() {
   try { TR = JSON.parse(localStorage.getItem(TKEY(S.id))) || []; } catch (e) { TR = []; }
   try { JR = JSON.parse(localStorage.getItem(LS_J)) || []; } catch (e) { JR = []; }
 }
-function save() { localStorage.setItem(TKEY(S.id), JSON.stringify(TR)); markDirty(); }
-function saveS() { localStorage.setItem(LS_ACC, JSON.stringify(ACC)); markDirty(); }
+function save() { localStorage.setItem(TKEY(S.id), JSON.stringify(TR)); ACC_IDX = null; markDirty(); }
+function saveS() { localStorage.setItem(LS_ACC, JSON.stringify(ACC)); ACC_IDX = null; markDirty(); }
+/* ---------- сделки нескольких счетов ---------- */
+let ACC_IDX = null;                                      // id сделки → id счёта
+function accById(id) { return ACC.accounts.find(a => a.id === id); }
+function accTrades(id) { if (S && id === S.id) return TR; try { return JSON.parse(localStorage.getItem(TKEY(id))) || []; } catch (e) { return []; } }
+function accIdx() { if (!ACC_IDX) { ACC_IDX = {}; ACC.accounts.forEach(a => accTrades(a.id).forEach(t => ACC_IDX[t.id] = a.id)); } return ACC_IDX; }
+/* выбор счетов: 'all' — все, 'cur' — активный, массив id — выбранные */
+function accIdsOf(v) {
+  if (!v || v === 'all') return ACC.accounts.map(a => a.id);
+  if (v === 'cur') return [S.id];
+  const ok = (Array.isArray(v) ? v : []).filter(id => accById(id));
+  return ok.length ? ok : [S.id];
+}
+function accSelName(v) {
+  if (!v || v === 'all') return ACC.accounts.length > 1 ? 'все счета' : S.name;
+  if (v === 'cur') return 'активный счёт «' + S.name + '»';
+  return accIdsOf(v).map(id => accById(id).name).join(', ');
+}
+function tradesOn(date, ids) {
+  const out = [];
+  ids.forEach(id => accTrades(id).forEach(t => { if (dOnly(new Date(tTime(t)).toISOString()) === date) out.push(Object.assign({ _acc: id }, t)); }));
+  return out.sort((a, b) => tTime(a) - tTime(b));
+}
+function tradesOfAccs(ids) { const out = []; ids.forEach(id => accTrades(id).forEach(t => out.push(Object.assign({ _acc: id }, t)))); return out; }
+/* переключатель счетов: Все · Активный · отдельные счета */
+function accPickHtml(key, v) {
+  if (ACC.accounts.length < 2) return '';
+  const ids = accIdsOf(v), mode = !v || v === 'all' ? 'all' : v === 'cur' ? 'cur' : 'pick';
+  return '<div class="accpick" data-ap="' + key + '"><span>Счета:</span>' +
+    '<button type="button" data-m="all" class="' + (mode === 'all' ? 'on' : '') + '">Все</button>' +
+    '<button type="button" data-m="cur" class="' + (mode === 'cur' ? 'on' : '') + '" title="Тот, что выбран в левом меню">Активный</button>' +
+    '<i></i>' + ACC.accounts.map(a => '<button type="button" data-a="' + a.id + '" class="ac ' + (mode === 'pick' && ids.includes(a.id) ? 'on' : '') + '">' + esc(a.name) + '</button>').join('') + '</div>';
+}
+function accPickBind(key, get, set) {
+  const box = document.querySelector('.accpick[data-ap="' + key + '"]'); if (!box) return;
+  box.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    let v;
+    if (b.dataset.m) v = b.dataset.m;
+    else {
+      const cur = get(), base = cur && cur !== 'all' && cur !== 'cur' ? accIdsOf(cur) : [];
+      const id = b.dataset.a, nx = base.includes(id) ? base.filter(x => x !== id) : base.concat(id);
+      v = nx.length ? nx : 'all';
+    }
+    set(v);
+  };
+}
 function saveJ() { localStorage.setItem(LS_J, JSON.stringify(JR)); markDirty(); }
 
 /* ---------------- счета ---------------- */
@@ -1439,7 +1493,7 @@ function dOnly(v) { const d = new Date(v); return d.getUTCFullYear() + '-' + P2(
 function toLocalInput(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d)) return ''; return d.getUTCFullYear() + '-' + P2(d.getUTCMonth() + 1) + '-' + P2(d.getUTCDate()) + 'T' + P2(d.getUTCHours()) + ':' + P2(d.getUTCMinutes()); }
 function fromInput(s) { if (!s) return null; const m = s.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])).toISOString() : null; }
 function nowInput() { const d = new Date(); return d.getFullYear() + '-' + P2(d.getMonth() + 1) + '-' + P2(d.getDate()) + 'T' + P2(d.getHours()) + ':' + P2(d.getMinutes()); }
-function riskAmt(t) { const p = t.riskPct != null && t.riskPct !== '' ? +t.riskPct : +S.risk; return S.balance * p / 100; }
+function riskAmt(t) { const a = (t._acc && accById(t._acc)) || S; const p = t.riskPct != null && t.riskPct !== '' ? +t.riskPct : +a.risk; return a.balance * p / 100; }
 function R(t) { const r = riskAmt(t); return r > 0 ? +t.net / r : null; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -2792,21 +2846,25 @@ const KILLTIMES = (() => { const a = []; for (let h = 7; h <= 23; h++) { a.push(
 const MAXTRADES = 6;
 
 /* ---- расчёты сделки (формулы листа «Неделя») ---- */
+function jAcc(t) {                     // счёт, к которому относится вход дня
+  return (t && t.srcAcc && accById(t.srcAcc)) || (t && t.srcId && accById(accIdx()[t.srcId])) || S;
+}
+function jDefAcc() { const ids = accIdsOf(draftAcc); return ids.length === 1 ? ids[0] : S.id; }
 function newJTrade() {
-  return { time: '', dir: 'Лонг', d1: false, h4: false, h1: false, m15: false, form: '', entry: null, stop: null, take: null,
+  return { srcAcc: jDefAcc(), time: '', dir: 'Лонг', d1: false, h4: false, h1: false, m15: false, form: '', entry: null, stop: null, take: null,
     lot: null, safePct: 50, safeRR: 3, riskPct: +S.risk || 0.3, rrPlan: 6, money: null, result: '', exit: null, bySystem: false, emotion: '', link: '', review: '', shots: [] };
 }
 /* Плановый лот — сколько должно быть под заданный риск */
 function jLotPlan(t) {
-  const cent = +S.centValue || 1;
+  const A = jAcc(t), cent = +A.centValue || 1;
   if (t.entry == null || t.stop == null || +t.entry === +t.stop) return null;
   const dist = Math.abs(+t.entry - +t.stop) / 0.01;   // расстояние в центах
-  const v = (+S.balance) * (+t.riskPct / 100) / (dist * cent);
+  const v = (+A.balance) * (+t.riskPct / 100) / (dist * cent);
   return isFinite(v) ? Math.round(v * 100) / 100 : null;
 }
 /* Фактический лот из терминала, если он известен, иначе плановый */
 function jLot(t) { return t.lot != null && t.lot !== '' ? +t.lot : jLotPlan(t); }
-function riskMoney(t) { return (+S.balance || 0) * ((+t.riskPct || 0) / 100); }
+function riskMoney(t) { return (+jAcc(t).balance || 0) * ((+t.riskPct || 0) / 100); }
 function hasMoney(t) { return t.money !== null && t.money !== undefined && t.money !== ''; }
 /* Итог RR: факт = деньги / риск в деньгах; если денег нет — план по типу результата */
 function jRR(t) {
@@ -2823,7 +2881,7 @@ function jMoney(t) {
   const r = jRR(t);
   return r === null ? null : r * riskMoney(t);
 }
-function jProfitPct(t) { const m = jMoney(t); return m === null || !S.balance ? null : m / S.balance * 100; }
+function jProfitPct(t) { const m = jMoney(t), b = +jAcc(t).balance; return m === null || !b ? null : m / b * 100; }
 function jOutcome(t) {
   if (hasMoney(t)) { const m = +t.money; return m > 0 ? 'Тейк' : m < 0 ? 'Стоп' : 'БУ'; }
   return t.result === 'Сейф/БУ' || t.result === 'Бу' ? 'БУ' : (t.result || '');
@@ -2844,13 +2902,16 @@ function dayTotals(d) {
   const all = jTrades(d), done = all.filter(jDone);
   const takes = done.filter(t => jOutcome(t) === 'Тейк').length, stops = done.filter(t => jOutcome(t) === 'Стоп').length;
   const profitUsd = done.reduce((s, t) => s + (jMoney(t) || 0), 0);
-  const profitPct = (+S.balance) ? profitUsd / S.balance * 100 : 0;
+  /* база для % — сумма депозитов счетов, по которым были входы (один счёт — его депозит) */
+  const accs = [...new Set(done.map(t => jAcc(t).id))];
+  const base = accs.length ? accs.reduce((s, id) => s + (+accById(id).balance || 0), 0) : (+S.balance || 0);
+  const profitPct = base ? profitUsd / base * 100 : 0;
   const sumR = done.reduce((s, t) => s + (jRR(t) || 0), 0);
   const rTakes = done.filter(t => jOutcome(t) === 'Тейк').map(jRR).filter(v => v != null);
   return {
     entries: done.length, all: all.length, takes, stops,
     wr: (takes + stops) ? takes / (takes + stops) * 100 : null,
-    profitPct, profitUsd,
+    profitPct, profitUsd, base, accs,
     lots: all.reduce((s, t) => s + (jLot(t) || 0), 0),
     lotsPlan: all.reduce((s, t) => s + (jLotPlan(t) || 0), 0),
     move: done.reduce((s, t) => s + (jMove(t) || 0), 0),
@@ -2900,7 +2961,7 @@ function renderJournal() {
 
   // факт из cTrader по датам
   const pnl = {};
-  TR.forEach(t => { const k = dOnly(new Date(tTime(t)).toISOString()); pnl[k] = pnl[k] || { net: 0, n: 0 }; pnl[k].net += +t.net; pnl[k].n++; });
+  days.forEach(d => { const f = tradesOn(d.date, dayAccIds(d)); if (f.length) pnl[d.date] = { net: f.reduce((s, t) => s + +t.net, 0), n: f.length }; });
 
   const tot = days.map(dayTotals);
   const sum = f => tot.reduce((s, x) => s + (+f(x) || 0), 0);
@@ -2913,7 +2974,7 @@ function renderJournal() {
   const overLimit = tot.filter(x => x.profitPct <= -(+S.ddLimit || 2)).length;
 
   const K = [
-    ['Профит за месяц', (profitPct > 0 ? '+' : '') + nf(profitPct, 2) + '%', profitPct > 0 ? 'up' : profitPct < 0 ? 'dn' : '', money(profitPct / 100 * S.balance) + ' · цель +' + nf(S.goalMonth || 20, 0) + '%'],
+    ['Профит за месяц', (profitPct > 0 ? '+' : '') + nf(profitPct, 2) + '%', profitPct > 0 ? 'up' : profitPct < 0 ? 'dn' : '', money(sum(x => x.profitUsd)) + ' · цель +' + nf(S.goalMonth || 20, 0) + '%'],
     ['Входов', entries, entries > days.length * MAXTRADES ? 'dn' : '', 'в среднем ' + nf(days.length ? entries / days.length : 0, 1) + ' в день'],
     ['Win Rate', (takes + stops) ? nf(takes / (takes + stops) * 100, 0) + '%' : '—', takes >= stops ? 'up' : 'dn', takes + ' тейк / ' + stops + ' стоп'],
     ['Сумма R', nf(sum(x => x.sumR), 2) + 'R', sum(x => x.sumR) > 0 ? 'up' : 'dn', 'ср. R по тейкам ' + (avg(x => x.avgRTake) === null ? '—' : nf(avg(x => x.avgRTake), 2))],
@@ -3075,7 +3136,7 @@ function jChart(days, tot) {
 
 function jDaysChart(days, tot) {
   const { g, w, h } = ctx('#cJDays', 210);
-  const rows = days.map((d, i) => ({ d: d.date, v: tot[i].profitPct, n: tot[i].entries })).filter(r => r.n);
+  const rows = days.map((d, i) => ({ d: d.date, v: tot[i].profitPct, u: tot[i].profitUsd, n: tot[i].entries })).filter(r => r.n);
   if (!rows.length) { g.fillStyle = '#5c6a7a'; g.textAlign = 'center'; g.fillText('Нет входов в этом месяце', w / 2, h / 2); hookTip('#cJDays', [], null); return; }
   const goal = +S.goalDay || 1, limit = -(+S.ddLimit || 2);
   const mx = Math.max(...rows.map(r => Math.abs(r.v)), goal, Math.abs(limit)) || 1;
@@ -3098,7 +3159,7 @@ function jDaysChart(days, tot) {
     g.fillStyle = r.v >= goal ? '#2ea86b' : r.v > 0 ? '#3f6f57' : '#e05260';
     g.fillRect(x, r.v >= 0 ? zero - hh : zero, bw, Math.max(1, hh));
     pts.push({ i, x: x + bw / 2, y: r.v >= 0 ? zero - hh - 6 : zero + hh + 6,
-      html: '<b>' + dFull(r.d + 'T00:00:00Z') + '</b><br><span class="' + cls(r.v) + '">' + (r.v > 0 ? '+' : '') + nf(r.v, 2) + '%</span> · ' + money(r.v / 100 * S.balance) + '<br><span class="mut">' + r.n + ' входов</span>' });
+      html: '<b>' + dFull(r.d + 'T00:00:00Z') + '</b><br><span class="' + cls(r.v) + '">' + (r.v > 0 ? '+' : '') + nf(r.v, 2) + '%</span> · ' + money(r.u) + '<br><span class="mut">' + r.n + ' входов</span>' });
   });
   g.fillStyle = '#5c6a7a'; g.textAlign = 'left'; g.fillText(dShort(rows[0].d + 'T00:00:00Z'), pad.l, h - 7);
   g.textAlign = 'right'; g.fillText(dShort(rows[rows.length - 1].d + 'T00:00:00Z'), w - pad.r, h - 7);
@@ -3124,7 +3185,11 @@ function openDay(id) {
     '<label class="chk"><input type="checkbox" data-c="' + f[0] + '"' + (d && d.close && d.close[f[0]] ? ' checked' : '') + '>' + f[1] + '</label>').join('');
   $$('#jFlags input').forEach(n => n.onchange = () => { jLivePct(); jtRender(); });
   draftMk = mkOf(d);
-  draftJT = d && d.trades ? d.trades.map(t => Object.assign(newJTrade(), t)) : [newJTrade()];
+  let defAcc = 'all';
+  try { defAcc = JSON.parse(localStorage.getItem(LS_JACC)) || 'all'; } catch (e) {}
+  draftAcc = d ? (d.accs || (dayAccIds(d).length === 1 && dayAccIds(d)[0] === S.id ? 'cur' : dayAccIds(d))) : defAcc;
+  draftJT = d && d.trades ? d.trades.map(t => Object.assign(newJTrade(), t, { srcAcc: jAcc(t).id })) : [newJTrade()];
+  jAccRender();
   lastTarget = 'tf'; lastTf = TFS[0][0]; lastJt = null;   // по умолчанию вставка идёт в D1
   drawMarkup();
   jSetTheme();
@@ -3146,7 +3211,7 @@ function jSetTheme() {
 }
 
 /* ---- таблица входов дня ---- */
-let draftJT = [];
+let draftJT = [], draftAcc = 'all';
 /* перенос сделки из импорта cTrader в строку журнала */
 const EMO_MAP = { 'Спокойствие': 'Спокоен', 'Уверенность': 'Уверен', 'Страх': 'Страх', 'Жадность': 'Жадность', 'FOMO': 'FOMO', 'Отыгрыш': 'Тильт' };
 function ctradeToRow(t) {
@@ -3169,11 +3234,30 @@ function ctradeToRow(t) {
     form: t.setup || '',
     emotion: EMO_MAP[t.emotion] || '',
     review: t.review || t.reason || '',
-    riskPct: +S.risk || 0.3
+    srcAcc: t._acc || S.id,
+    riskPct: +((t._acc && accById(t._acc)) || S).risk || 0.3
   });
 }
-function dayTradesFromCT(date) {
-  return TR.filter(t => dOnly(new Date(tTime(t)).toISOString()) === date).sort((a, b) => tTime(a) - tTime(b));
+const LS_JACC = 'fxj.jacc.v1';
+/* какие счета у дня: сохранённый выбор, иначе — счета, из которых уже перенесены сделки, иначе активный */
+function dayAccIds(d) {
+  if (d && d.accs) return accIdsOf(d.accs);
+  const ids = [...new Set(((d && d.trades) || []).filter(t => t.srcId || t.srcAcc).map(t => jAcc(t).id))];
+  return ids.length ? ids : [S.id];
+}
+function dayTradesFromCT(date) { return tradesOn(date, accIdsOf(draftAcc)); }
+function jAccRender() {
+  const box = $('#jAccPick'); if (!box) return;
+  box.innerHTML = accPickHtml('jday', draftAcc);
+  accPickBind('jday', () => draftAcc, v => {
+    draftAcc = v;
+    try { localStorage.setItem(LS_JACC, JSON.stringify(v)); } catch (e) {}
+    const keep = new Set(accIdsOf(v));
+    // перенесённые сделки со снятых счетов убираем, с добавленных — подтягиваем
+    draftJT = draftJT.filter(t => !t.srcId || keep.has(jAcc(t).id));
+    if (!draftJT.length) draftJT = [newJTrade()];
+    jAccRender(); pullTrades(true); jtRender();
+  });
 }
 function pullTrades(silent) {
   const date = $('#j_date').value;
@@ -3186,6 +3270,7 @@ function pullTrades(silent) {
   }
   draftJT = draftJT.filter(t => jDone(t) || t.entry != null || t.time);   // убираем пустую заготовку
   src.forEach(t => draftJT.push(ctradeToRow(t)));
+  draftJT.sort((x, y) => (x.time || '99:99').localeCompare(y.time || '99:99'));   // по времени, вперемешку со всех счетов
   if (!draftJT.length) draftJT = [newJTrade()];
   jtRender();
   if (!silent) toast('Перенесено ' + src.length +
@@ -3210,7 +3295,8 @@ function jtRender() {
     const lot = jLot(t), rr = jRR(t), pp = jProfitPct(t), mv = jMove(t), out = jOutcome(t);
     const oc = out === 'Тейк' ? 'up' : out === 'Стоп' ? 'dn' : 'mut';
     return '<tr style="cursor:default">' +
-      '<td class="mut">' + (i + 1) + (t.srcId ? '<div class="ctmark" title="перенесено из cTrader">↧</div>' : '') + '</td>' +
+      '<td class="mut">' + (i + 1) + (t.srcId ? '<div class="ctmark" title="перенесено из cTrader">↧</div>' : '') +
+        (ACC.accounts.length > 1 ? '<div class="jtacc" title="счёт">' + esc(jAcc(t).name) + '</div>' : '') + '</td>' +
       '<td>' + str(t.time, i, 'time', 'чч:мм', 'dlTimes') + '</td>' +
       '<td>' + sel(t.dir, DIRS, i, 'dir') + '</td>' +
       ['d1', 'h4', 'h1', 'm15'].map(k => '<td style="text-align:center">' + chk(t[k], i, k) + '</td>').join('') +
@@ -3262,8 +3348,8 @@ function jtRender() {
   const avail = date ? dayTradesFromCT(date).length : 0;
   const taken = draftJT.filter(t => t.srcId).length;
   $('#jtSrc').innerHTML = avail
-    ? 'в импорте за этот день: <b>' + avail + '</b>' + (taken ? ' · перенесено ' + taken : '')
-    : '<span class="mut">в импорте сделок за этот день нет</span>';
+    ? 'в импорте за этот день: <b>' + avail + '</b>' + (taken ? ' · перенесено ' + taken : '') + (ACC.accounts.length > 1 ? ' · ' + esc(accSelName(draftAcc)) : '')
+    : '<span class="mut">в импорте сделок за этот день нет' + (ACC.accounts.length > 1 ? ' (' + esc(accSelName(draftAcc)) + ')' : '') + '</span>';
   $$('#jtNotes input').forEach(inp => inp.addEventListener('focus', e => setPasteJt(+e.target.dataset.ni)));
   $$('#jtNotes .jtnote').forEach((el, i) => el.addEventListener('mousedown', () => setPasteJt(i)));
   $$('#jtNotes [data-jtdrop]').forEach(dz => {
@@ -3317,7 +3403,7 @@ function jtCalc() {
       t.takes + ' тейк · ' + t.stops + ' стоп' + (t.entries > MAXTRADES ? ' · план ≤ ' + MAXTRADES : '')],
     ['Win Rate', t.wr === null ? '—' : nf(t.wr, 0) + '%', t.wr >= 50 ? 'up' : '', 'тейки к стопам'],
     ['Профит %', (t.profitPct > 0 ? '+' : '') + nf(t.profitPct, 2) + '%', t.profitPct >= goal ? 'up' : t.profitPct < 0 ? 'dn' : '', 'цель дня +' + nf(goal, 0) + '%'],
-    ['Профит $', money(t.profitUsd), cls(t.profitPct), 'от депозита ' + nf(S.balance, 0)],
+    ['Профит $', money(t.profitUsd), cls(t.profitPct), 'от депозита ' + nf(t.base, 0) + (t.accs.length > 1 ? ' · ' + t.accs.length + ' счёта' : '')],
     ['Сумма R', nf(t.sumR, 2) + 'R', cls(t.sumR), t.avgRTake === null ? 'ср. R тейка —' : 'ср. R тейка ' + nf(t.avgRTake, 2)],
     ['Объём', nf(t.lots, 2) + ' лот', t.lotsPlan && t.lots > t.lotsPlan * 1.15 ? 'dn' : '',
       (t.lotsPlan ? 'план ' + nf(t.lotsPlan, 2) + ' · ' : '') + 'ход цены ' + nf(t.move, 2)],
@@ -3444,7 +3530,7 @@ function saveDay() {
   TFS.forEach(t => markup[t[0]] = { done: draftMk[t[0]].done, note: draftMk[t[0]].note.trim(), link: (draftMk[t[0]].link || '').trim(), shots: draftMk[t[0]].shots.slice() });
   const trades = draftJT.filter(t => jDone(t) || t.entry != null || t.time);
   const rec = {
-    id: jEditId || uid(), date, week: +$('#j_week').value, accent: $('#j_accent').value,
+    id: jEditId || uid(), date, week: +$('#j_week').value, accent: $('#j_accent').value, accs: draftAcc,
     flags, close, markup, trades, note: $('#j_note').value.trim()
   };
   if (jEditId) JR = JR.map(d => d.id === jEditId ? rec : d); else JR.push(rec);
@@ -3472,11 +3558,9 @@ function saveCirc() { localStorage.setItem(LS_CIRC, JSON.stringify(CIRC)); markD
 
 const CKINDS = [['', 'Пусто'], ['win', 'Плюс'], ['loss', 'Минус'], ['be', 'В ноль']];
 function circKind(t) { return +t.net > 0 ? 'win' : +t.net < 0 ? 'loss' : 'be'; }
-function circTradesFor(date) {
-  return TR.filter(t => dOnly(new Date(tTime(t)).toISOString()) === date).sort((a, b) => tTime(a) - tTime(b));
-}
+function circTradesFor(date) { return tradesOn(date, accIdsOf(CIRC.accs)); }
 function circDays() {
-  const fromTrades = TR.map(t => dOnly(new Date(tTime(t)).toISOString()));
+  const fromTrades = tradesOfAccs(accIdsOf(CIRC.accs)).map(t => dOnly(new Date(tTime(t)).toISOString()));
   return [...new Set(fromTrades.concat(Object.keys(CIRC.marks || {})))].sort().reverse();
 }
 /* Кружки дня — два слоя в одном:
@@ -3588,6 +3672,7 @@ function circTip(day, i) {
   const t = x.t;
   if (t) {
     const dec = px(t.symbol), r = R(t), pp = calcPips(t);
+    if (t._acc && ACC.accounts.length > 1) h += '<br><span class="mut">счёт: ' + esc((accById(t._acc) || {}).name || '') + '</span>';
     h += '<br>' + dt(t.closeTime || t.openTime) + ' · <b>' + esc(t.symbol) + '</b> ' + (t.side === 'buy' ? 'BUY' : 'SELL') +
       (t.volume != null ? ' · ' + nf(t.volume) + ' лот' : '');
     if (t.openPrice != null) h += '<br>вход ' + nf(t.openPrice, dec) + (t.closePrice != null ? ' → выход ' + nf(t.closePrice, dec) : '');
@@ -3677,7 +3762,9 @@ function renderCirc() {
   const net = trades.reduce((s, t) => s + +t.net, 0);
   const dow = DOW[new Date(circDay + 'T00:00:00Z').getUTCDay()];
 
-  $('#circSub').textContent = 'Дней в дневнике: ' + days.length + ' · кружки берутся из сделок, но их можно ставить и вручную';
+  $('#circSub').textContent = 'Дней в дневнике: ' + days.length + ' · кружки из сделок: ' + accSelName(CIRC.accs) + ' · их можно ставить и вручную';
+  $('#circAccPick').innerHTML = accPickHtml('circ', CIRC.accs || 'all');
+  accPickBind('circ', () => CIRC.accs || 'all', v => { CIRC.accs = v; saveCirc(); renderCirc(); });
   $('#circDayTitle').innerHTML = dFull(circDay + 'T00:00:00Z') + ' · ' + dow +
     (manual ? ' <span class="pill" style="background:rgba(59,130,246,.15);border-color:var(--acc);color:var(--acc2)">размечен вручную</span>' : '');
   $('#circDayStat').innerHTML = (list.filter(x => x.k).length || trades.length)
@@ -4526,7 +4613,7 @@ const HELP = [
   ['С чего начать', [
     ['1. Настрой счёт', 'Настройки → депозит, валюта, риск на сделку 0.3%, лимит дня 2% и стоимость 1 цента (0.01) на 1 лот у твоего брокера. От этих цифр считается объём позиции и профит в деньгах.'],
     ['2. Заполни «Шаблон ТС»', 'Пройди по D1→M1 и пяти формациям, добавь свои эталонные скриншоты. Это твой личный гайд: смотришь его перед сессией, а не вспоминаешь по памяти.'],
-    ['3. Заводи день ПЕРЕД торговлей', 'Журнал дня → «+ День». Сначала чек-лист и разметка, потом входы. Заполнять журнал после слива — бесполезно.']
+    ['3. Заводи день ПЕРЕД торговлей', 'Журнал → «+ День». Сначала чек-лист и разметка, потом входы. Заполнять журнал после слива — бесполезно.']
   ]],
   ['Чек-лист дня — 8 пунктов', [
     ['Утренний ритуал', 'Встал, привёл себя в порядок, сел за терминал в рабочем состоянии, а не «на бегу».'],
@@ -4612,9 +4699,7 @@ function repDays() {
 }
 const rOpt = k => $('#r_opts .tag[data-o="' + k + '"]').classList.contains('on');
 
-function repTrades(date) {
-  return TR.filter(t => dOnly(new Date(tTime(t)).toISOString()) === date).sort((a, b) => tTime(a) - tTime(b));
-}
+function repTrades(date, d) { return tradesOn(date, dayAccIds(d || JR.find(x => x.date === date))); }
 async function makeReport() {
   const days = repDays();
   if (!days.length) return toast('Нет данных за выбранный период');
@@ -4767,7 +4852,7 @@ async function buildReport(days) {
       h += '</tbody></table>';
     }
 
-    const fact = repTrades(d.date);
+    const fact = repTrades(d.date, d);
     if (rOpt('trades') && fact.length) {
       const fnet = fact.reduce((s, x) => s + +x.net, 0);
       h += '<div class="rnote"><b>Факт из cTrader:</b> ' + fact.length + ' сделок, результат <b class="' + (fnet >= 0 ? 'g' : 'r') + '">' + money(fnet) + '</b></div>';
@@ -5696,7 +5781,7 @@ function wipeItems() {
   return [
     ['trades', 'Сделки счёта «' + S.name + '»', TR.length + ' ' + plural(TR.length, ['сделка', 'сделки', 'сделок']) + ' · скриншоты сделок тоже удалятся'],
     ['tradesAll', 'Сделки на ВСЕХ счетах', allTrades + ' ' + plural(allTrades, ['сделка', 'сделки', 'сделок']) + ' по ' + ACC.accounts.length + ' ' + plural(ACC.accounts.length, ['счёту', 'счетам', 'счетам'])],
-    ['journal', 'Журнал дня', JR.length + ' ' + plural(JR.length, ['день', 'дня', 'дней']) + ' · разметка, входы и скриншоты'],
+    ['journal', 'Журнал', JR.length + ' ' + plural(JR.length, ['день', 'дня', 'дней']) + ' · разметка, входы и скриншоты'],
     ['reviews', 'Разборы недель и месяцев', 'чек-листы закрытия и тексты анализа'],
     ['kb', 'База знаний и Бэктесты', KB.length + ' ' + plural(KB.length, ['файл', 'файла', 'файлов']) + ' · ' + fmtSize(kbSize) + ' и все папки']
   ];
