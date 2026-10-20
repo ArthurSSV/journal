@@ -386,6 +386,49 @@ canvas{cursor:crosshair}
 #report .rchklist{display:grid;grid-template-columns:repeat(2,1fr);gap:2px 14px}
 #report .rbox.space .lines{height:34mm;background:repeating-linear-gradient(#fff 0 7mm,#ddd 7mm 7.2mm);margin-top:5px;border:1px solid #eee}
 #report .rfoot{margin-top:14px;padding-top:6px;border-top:1px solid #ccc;font-size:9px;color:#777;text-align:center}
+/* ---------- бэктесты ---------- */
+.btcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.btcard{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;cursor:pointer;transition:.15s;min-width:0}
+.btcard:hover{border-color:#3d4b5c;background:#18202a}
+.btcard h3{font-size:14.5px;font-weight:600;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btcard .bm{font-size:11.5px;color:var(--tx3);margin-bottom:10px}
+.btcard .bk{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.btcard .bk b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
+.btcard .bk span{font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.3px}
+.btprog{height:5px;border-radius:3px;background:var(--bg3);margin-top:12px;overflow:hidden}
+.btprog i{display:block;height:100%;background:var(--acc)}
+#btTbl td,#btTbl th{padding:7px 8px;font-size:12px}
+#btTbl th{font-size:10px;cursor:default}
+#btTbl tbody tr{cursor:pointer}
+#btTbl tbody tr:hover td{background:#18202a}
+#btTbl td.fl{font-size:13px;text-align:center;padding:7px 4px}
+#btTbl .cm{max-width:260px;overflow:hidden;text-overflow:ellipsis;color:var(--tx2)}
+#btTbl td:first-child,#btTbl th:first-child{position:sticky;left:0;background:var(--bg2);z-index:1}
+#btTbl th:first-child{background:var(--bg3);z-index:2}
+.fup{color:var(--up)}.fdn{color:var(--dn)}
+.btgrp{border:1px solid var(--line);border-radius:10px;padding:12px 14px 4px;margin-bottom:12px;background:var(--bg)}
+.btgrp>h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--acc2);margin-bottom:10px;font-weight:600}
+.btg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0 12px}
+.seg2{display:flex;flex-wrap:wrap;gap:4px}
+.seg2 button{padding:6px 11px;border-radius:7px;border:1px solid var(--line);background:var(--bg2);font-size:12.5px;color:var(--tx2)}
+.seg2 button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.seg2 button.on.u{background:var(--up);border-color:var(--up)}
+.seg2 button.on.d{background:var(--dn);border-color:var(--dn)}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.chips button{padding:3px 8px;border-radius:12px;border:1px dashed var(--line);font-size:11.5px;color:var(--tx2)}
+.chips button:hover{border-color:var(--acc);color:var(--tx)}
+.btcalc{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:2px 0 10px}
+.btcalc div{background:var(--bg3);border-radius:8px;padding:8px 10px}
+.btcalc span{display:block;font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.3px}
+.btcalc b{font-size:15px;font-variant-numeric:tabular-nums}
+.btsec{margin-top:16px}
+.btsec h2{margin-bottom:8px}
+.btcut td.num,.btcut th.num{text-align:right}
+.btread li{margin:0 0 6px 18px;font-size:12.5px;color:var(--tx2)}
+.btins h3{font-size:13.5px;margin:16px 0 6px;color:var(--acc2)}
+.btins p{font-size:13px;color:var(--tx2);margin-bottom:6px;line-height:1.6}
+.btshot{position:fixed;z-index:130;pointer-events:none;border:1px solid #3a4756;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:520px;background:#0d1117;display:none}
+@media(max-width:560px){.btcard .bk{grid-template-columns:repeat(2,1fr)}.btg{grid-template-columns:1fr 1fr}}
 /* ---------- планшеты и узкие окна ---------- */
 @media(max-width:1100px){
   .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -505,6 +548,7 @@ canvas{cursor:crosshair}
       <button data-p="stats"><span class="ic">◨</span>Аналитика</button>
       <button data-p="journal"><span class="ic">✓</span>Журнал дня</button>
       <button data-p="circ"><span class="ic">◉</span>Дневник кружков</button>
+      <button data-p="bt"><span class="ic">⟲</span>Бэктесты</button>
       <button data-p="kb"><span class="ic">▤</span>База знаний</button>
       <button data-p="import"><span class="ic">↧</span>Импорт cTrader</button>
       <button data-p="settings"><span class="ic">⚙</span>Настройки</button>
@@ -565,6 +609,12 @@ canvas{cursor:crosshair}
         <div class="chartbox"><h2>P&L по дням</h2><canvas id="cDaily" height="200"></canvas></div>
         <div class="chartbox"><h2>Последние сделки</h2><div id="recent"></div></div>
       </div>
+    </section>
+
+    <!-- ======== BACKTESTS ======== -->
+    <section class="page" id="p-bt">
+      <div id="btList"></div>
+      <div id="btOne" style="display:none"></div>
     </section>
 
     <!-- ======== TRADES ======== -->
@@ -1161,6 +1211,17 @@ canvas{cursor:crosshair}
       <button class="btn dgr" onclick="wipeApply()">Удалить отмеченное</button></div></div>
   </div>
 </div>
+
+<!-- ======== BACKTEST ROW MODAL ======== -->
+<div class="mask" id="btMask">
+  <div class="modal" style="max-width:min(1080px,96vw)">
+    <div class="mhead"><b id="btmTitle">Сделка бэктеста</b><button class="x" onclick="btClose()">×</button></div>
+    <div class="mbody" id="btmBody"></div>
+    <div class="mfoot"><div class="row"><button class="btn dgr" id="btmDel" onclick="btDelRow()">Удалить</button><button class="btn" id="btmDup" onclick="btDupRow()">Дублировать</button></div>
+      <div class="row"><button class="btn" onclick="btClose()">Отмена</button><button class="btn pri" onclick="btSaveRow()">Сохранить</button></div></div>
+  </div>
+</div>
+<input type="file" id="btFile" accept=".xlsx,.csv,.tsv,.txt" style="display:none">
 
 <!-- ======== KB VIEWER ======== -->
 <div class="mask" id="kbMask" style="padding:0">
@@ -4594,7 +4655,7 @@ async function buildBackup(withKb) {
     if (d.markup) for (const t of TFS) for (const s of ((d.markup[t[0]] || {}).shots || [])) { const x = await getShot(s); if (x) shots[s] = x; }
     if (d.trades) for (const t of d.trades) for (const s of (t.shots || [])) { const x = await getShot(s); if (x) shots[s] = x; }
   }
-  const out = { v: 3, saved: Date.now(), accounts: ACC, trades, journal: JR, quotes: QS, reviews: RV, profile: PROF, kbList: KB, kbFolders: KBF, circles: CIRC, shots };
+  const out = { v: 3, saved: Date.now(), accounts: ACC, trades, journal: JR, quotes: QS, reviews: RV, profile: PROF, kbList: KB, kbFolders: KBF, circles: CIRC, backtests: BT, shots };
   if (withKb) {
     out.kbFiles = {};
     for (const f of KB) {
@@ -4615,6 +4676,7 @@ async function applyBackup(d) {
     if (d.profile) { PROF = d.profile; localStorage.setItem(LS_P, JSON.stringify(PROF)); }
     if (d.kbList) { KB = d.kbList; KBF = d.kbFolders || []; saveKB(); }
     if (d.circles) { CIRC = d.circles; saveCirc(); }
+    if (d.backtests) { BT = d.backtests; saveBT(); }
     if (d.kbFiles) {
       for (const id in d.kbFiles) {
         const res = await fetch(d.kbFiles[id]);
@@ -5122,6 +5184,7 @@ function wipeItems() {
     ['tradesAll', 'Сделки на ВСЕХ счетах', allTrades + ' ' + plural(allTrades, ['сделка', 'сделки', 'сделок']) + ' по ' + ACC.accounts.length + ' ' + plural(ACC.accounts.length, ['счёту', 'счетам', 'счетам'])],
     ['journal', 'Журнал дня', JR.length + ' ' + plural(JR.length, ['день', 'дня', 'дней']) + ' · разметка, входы и скриншоты'],
     ['reviews', 'Разборы недель и месяцев', 'чек-листы закрытия и тексты анализа'],
+    ['bt', 'Бэктесты', BT.length + ' ' + plural(BT.length, ['бэктест', 'бэктеста', 'бэктестов']) + ' · ' + BT.reduce((s, b) => s + (b.rows || []).length, 0) + ' сделок'],
     ['kb', 'База знаний', KB.length + ' ' + plural(KB.length, ['файл', 'файла', 'файлов']) + ' · ' + fmtSize(kbSize) + ' и все папки']
   ];
 }
@@ -5162,6 +5225,7 @@ async function wipeApply() {
     }
     JR = []; saveJ();
   }
+  if (on.includes('bt')) { BT = []; saveBT(); btCur = null; }
   if (on.includes('reviews')) { RV = { weeks: {}, months: {}, stops: {} }; saveRV(); }
   if (on.includes('kb')) {
     for (const f of KB) await idbDel('kb', f.id);
@@ -5196,6 +5260,659 @@ function demoData() {
   TR = TR.concat(out); save(); renderAll(); go('dash'); toast('Добавлено 45 демо-сделок');
 }
 
+/* =================== БЭКТЕСТЫ ===================
+   Повторяет Excel-шаблон «Матрёшка Бэк Тест»: Параметры · Журнал · Итоги · Инструкция.
+   Формулы те же: Стоп $ = |вход − стоп|, РР = |цель − вход| ÷ стоп $,
+   лотов = риск $ ÷ стоп $ ÷ цену 1 $ хода, округление ВНИЗ до шага лота,
+   R: цель → РР, стоп → −1, безубыток → 0, частичная/руками → R вручную; $ = R × лотов × стоп $ × цену хода. */
+const LS_BT = 'fxj.bt.v1';
+let BT = [];
+try { BT = JSON.parse(localStorage.getItem(LS_BT)) || []; } catch (e) { BT = []; }
+function saveBT() { localStorage.setItem(LS_BT, JSON.stringify(BT)); markDirty(); }
+let btCur = null, btTab = 'j', btEdit = null;
+const BT_DEF = () => ({ dep: 50000, risk: 0.2, pv: 100, step: 0.01, target: 30 });
+const BT_O = {
+  sess: ['Азия', 'Европа', 'Америка'],
+  tf: ['М1', '5м', '15м'],
+  side: ['лонг', 'шорт'],
+  flow: ['вверх', 'вниз', '—'],
+  yn: ['да', 'нет'],
+  zone: ['Сильный продавец', 'Сильный покупатель', 'Средний продавец', 'Средний покупатель', 'Красивый продавец', 'Красивый покупатель',
+    'Разворотная зона', 'Зона входа', 'Проторговка', 'Зона 15м 0.5', 'Зона 1Ч 0.5', 'Зона 4Ч 0.5'],
+  swept: ['приманка', 'полка', 'уровень 15м', 'уровень 1Ч', 'уровень 4Ч', 'склейка 15м/1Ч', 'ничего не снято'],
+  candle: ['Лонг 1', 'Лонг 2', 'Лонг 3', 'Шорт 1', 'Шорт 2', 'Шорт 3'],
+  outcome: ['цель', 'стоп', 'безубыток', 'частичная фиксация', 'закрыл руками'],
+  struct: ['пробой ↑', 'пробой ↓', 'слом ↑', 'слом ↓', 'ложный пробой ↑', 'ложный пробой ↓'],
+  touch: ['1', '2', '3', '4']
+};
+/* колонки как в Excel: ключ, заголовок, синонимы для импорта */
+const BT_COLS = [
+  ['n', '#'], ['date', 'Дата'], ['time', 'Время МСК', 'время'], ['sess', 'Сессия'], ['tf', 'ТФ входа', 'тф'], ['side', 'Сторона'],
+  ['fD', 'Поток Д'], ['f4', 'Поток 4Ч'], ['f1', 'Поток 1Ч'], ['f15', 'Поток 15м'],
+  ['struct', 'Структура — что написал индикатор', 'структура'], ['zone', 'Вид зоны'], ['fuel', 'Топливо'], ['touch', 'Касание'],
+  ['against', 'Зона против потока'], ['swept', 'Что снято'], ['sweptLvl', 'Уровень снятия'], ['candle', 'Цвет свечи входа'],
+  ['entry', 'Вход'], ['stop', 'Стоп'], ['target', 'Цель'], ['_stopUsd', 'Стоп, $'], ['_rr', 'РР'], ['_lots', 'Лотов'],
+  ['check', 'Чек-лист 7/7', 'чек-лист'], ['outcome', 'Исход'], ['rMan', 'R вручную'], ['_r', 'R'], ['_usd', 'Результат, $', 'результат'],
+  ['hit1', 'Дошла до 1:1'], ['hit3', 'Дошла до 1:3'], ['link', 'Ссылка на TradingView', 'ссылка'], ['comment', 'Комментарий'], ['_streak', 'серия стопов']
+];
+const btP = b => Object.assign(BT_DEF(), b.params || {});
+const btNum = v => {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return v;
+  const raw = String(v), s = raw.replace(/[\s $x×%()−]/g, '').replace(',', '.');
+  const n = parseFloat(s);
+  if (isNaN(n)) return null;
+  return (raw.indexOf('(') >= 0 || raw.indexOf('−') >= 0) ? -Math.abs(n) : n;
+};
+function btCalc(b, r) {
+  const p = btP(b), e = btNum(r.entry), s = btNum(r.stop), t = btNum(r.target);
+  const o = { stopUsd: null, rr: null, lots: null, r: null, usd: null, riskUsd: p.dep * p.risk / 100 };
+  if (e !== null && s !== null && e !== s) {
+    o.stopUsd = Math.abs(e - s);
+    if (t !== null) o.rr = Math.abs(t - e) / o.stopUsd;
+    o.lots = Math.floor(o.riskUsd / o.stopUsd / p.pv / p.step + 1e-9) * p.step;
+  }
+  const oc = (r.outcome || '').toLowerCase();
+  if (oc === 'цель') o.r = o.rr;
+  else if (oc === 'стоп') o.r = -1;
+  else if (oc === 'безубыток') o.r = 0;
+  else if (oc) o.r = btNum(r.rMan);
+  if (o.r !== null && o.lots !== null && o.stopUsd !== null) o.usd = o.r * o.lots * o.stopUsd * p.pv;
+  return o;
+}
+function btRows(b) {
+  const key = x => (x.date || '9999') + ' ' + (x.time || '').padStart(5, '0');
+  const rows = (b.rows || []).slice().sort((x, y) => key(x).localeCompare(key(y)));
+  let streak = 0;
+  return rows.map((r, i) => {
+    const c = btCalc(b, r);
+    if (r.outcome === 'стоп') streak++; else if (r.outcome) streak = 0;
+    return Object.assign({}, r, { _i: i + 1, _c: c, _streak: r.outcome === 'стоп' ? streak : 0 });
+  });
+}
+function btStats(b) {
+  const rows = btRows(b), p = btP(b);
+  const done = rows.filter(r => r.outcome && r._c.r !== null);
+  const cnt = k => done.filter(r => r.outcome === k).length;
+  const plus = done.filter(r => r._c.r > 0).reduce((s, r) => s + r._c.r, 0);
+  const minus = Math.abs(done.filter(r => r._c.r < 0).reduce((s, r) => s + r._c.r, 0));
+  const rrs = rows.map(r => r._c.rr).filter(v => v !== null);
+  let worst = 0; rows.forEach(r => worst = Math.max(worst, r._streak));
+  const usd = done.reduce((s, r) => s + (r._c.usd || 0), 0), R = plus - minus;
+  const pct = f => done.length ? done.filter(f).length / done.length * 100 : null;
+  const withFlow = done.filter(r => (r.side === 'лонг' && r.f4 === 'вверх') || (r.side === 'шорт' && r.f4 === 'вниз'));
+  const vsFlow = done.filter(r => (r.side === 'лонг' && r.f4 === 'вниз') || (r.side === 'шорт' && r.f4 === 'вверх'));
+  const sumR = l => l.reduce((s, r) => s + r._c.r, 0);
+  return {
+    rows, done, n: done.length, total: rows.length, target: p.target,
+    win: cnt('цель'), stop: cnt('стоп'), be: cnt('безубыток'), part: cnt('частичная фиксация'), hand: cnt('закрыл руками'),
+    wr: done.length ? done.filter(r => r._c.r > 0).length / done.length * 100 : null,
+    plus, minus, pf: minus > 0 ? plus / minus : (plus > 0 ? Infinity : null),
+    avgRR: rrs.length ? rrs.reduce((a, c) => a + c, 0) / rrs.length : null,
+    R, usd, pctDep: p.dep ? usd / p.dep * 100 : null, worst,
+    hit1: pct(r => r.hit1 === 'да'), hit3: pct(r => r.hit3 === 'да'), check: pct(r => r.check === 'да'),
+    withFlow: withFlow.length, withFlowR: sumR(withFlow), vsFlow: vsFlow.length, vsFlowR: sumR(vsFlow),
+    from: rows.length ? rows[0].date : '', to: rows.length ? rows[rows.length - 1].date : ''
+  };
+}
+const btF = (v, d) => v === null || v === undefined || isNaN(v) ? '—' : nf(v, d === undefined ? 2 : d);
+const btPx = v => { const n = btNum(v); return n === null ? '' : n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 3 }); };
+const btD = d => d ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(2, 4) : '';
+const btUsd = v => v === null || v === undefined || isNaN(v) ? '—' : (v < 0 ? '−' : '') + '$' + nf(Math.abs(v));
+const btPF = v => v === null || v === undefined ? '—' : v === Infinity ? '∞' : nf(v);
+
+/* ---------- список бэктестов ---------- */
+function renderBT() {
+  const L = $('#btList'), O = $('#btOne');
+  if (!L) return;
+  const b = BT.find(x => x.id === btCur);
+  if (!b) { btCur = null; L.style.display = ''; O.style.display = 'none'; return renderBTList(); }
+  L.style.display = 'none'; O.style.display = '';
+  renderBTOne(b);
+}
+function renderBTList() {
+  const cards = BT.map(b => {
+    const s = btStats(b), prog = Math.min(100, s.target ? s.n / s.target * 100 : 0);
+    return '<div class="btcard" onclick="btOpen(\'' + b.id + '\')">' +
+      '<h3>' + esc(b.name) + '</h3>' +
+      '<div class="bm">' + (s.from ? btD(s.from) + ' — ' + btD(s.to) + ' · ' : '') + s.n + ' из ' + s.target + ' сделок · риск ' + nf(btP(b).risk) + '%</div>' +
+      '<div class="bk">' +
+      '<div><b class="' + (s.wr === null ? '' : s.wr >= 50 ? 'up' : 'dn') + '">' + (s.wr === null ? '—' : nf(s.wr, 1) + '%') + '</b><span>Винрейт</span></div>' +
+      '<div><b class="' + (s.pf === null ? '' : s.pf >= 1 ? 'up' : 'dn') + '">' + btPF(s.pf) + '</b><span>Профит-фактор</span></div>' +
+      '<div><b class="' + cls(s.R) + '">' + nf(s.R) + 'R</b><span>Итог</span></div>' +
+      '<div><b class="' + cls(s.usd) + '">' + btUsd(s.usd) + '</b><span>' + (s.pctDep === null ? '' : nf(s.pctDep) + '% депо') + '</span></div>' +
+      '</div><div class="btprog"><i style="width:' + prog + '%"></i></div></div>';
+  }).join('');
+  $('#btList').innerHTML =
+    '<div class="row" style="justify-content:space-between;margin-bottom:16px">' +
+    '<div><h1>Бэктесты</h1><div class="sub">Тест системы на истории — как в Excel-шаблоне, только всё считается само</div></div>' +
+    '<div class="row"><button class="btn" onclick="btImportNew()">Импорт из Excel</button><button class="btn pri" onclick="btNew()">+ Новый бэктест</button></div></div>' +
+    (BT.length ? '<div class="btcards">' + cards + '</div>' :
+      '<div class="card empty" style="line-height:1.8"><div class="big">⟲</div>Бэктестов пока нет.<br>' +
+      '<span style="font-size:12.5px">Создай новый или загрузи свой Excel-файл «Матрёшка Бэк Тест» — сделки, параметры и итоги перенесутся автоматически.</span><br><br>' +
+      '<button class="btn" onclick="btImportNew()">Импорт из Excel</button> <button class="btn pri" onclick="btNew()">+ Новый бэктест</button></div>');
+}
+function btOpen(id) { btCur = id; btTab = 'j'; renderBT(); window.scrollTo(0, 0); }
+function btNew() {
+  const name = prompt('Название бэктеста', 'Матрёшка Бэк Тест ' + (BT.length + 1));
+  if (!name) return;
+  const b = { id: uid(), name: name.trim(), created: Date.now(), params: BT_DEF(), rows: [] };
+  BT.unshift(b); saveBT(); btOpen(b.id);
+}
+function btDelete() {
+  const b = BT.find(x => x.id === btCur); if (!b) return;
+  if (!confirm('Удалить бэктест «' + b.name + '» со всеми сделками (' + (b.rows || []).length + ')?')) return;
+  BT = BT.filter(x => x.id !== b.id); saveBT(); btCur = null; renderBT(); toast('Бэктест удалён');
+}
+
+/* ---------- один бэктест ---------- */
+function btSetTab(t) { btTab = t; renderBT(); }
+function renderBTOne(b) {
+  const s = btStats(b);
+  const tabs = [['j', 'Журнал'], ['s', 'Итоги'], ['p', 'Параметры'], ['h', 'Инструкция']];
+  let h = '<div class="row" style="justify-content:space-between;margin-bottom:12px;align-items:flex-start">' +
+    '<div style="min-width:0"><button class="btn sm" onclick="btCur=null;renderBT()" style="margin-bottom:8px">← Все бэктесты</button>' +
+    '<h1 style="overflow-wrap:anywhere">' + esc(b.name) + '</h1>' +
+    '<div class="sub">' + s.n + ' из ' + s.target + ' сделок · винрейт ' + (s.wr === null ? '—' : nf(s.wr, 1) + '%') + ' · PF ' + btPF(s.pf) +
+    ' · итог <span class="' + cls(s.R) + '">' + nf(s.R) + 'R · ' + btUsd(s.usd) + '</span></div></div>' +
+    '<div class="row"><button class="btn" onclick="btExport()">Экспорт в Excel</button><button class="btn" onclick="btImportInto()">Импорт сделок</button>' +
+    '<button class="btn pri" onclick="btOpenRow()">+ Сделка</button></div></div>' +
+    '<div class="subtabs">' + tabs.map(t => '<button class="' + (btTab === t[0] ? 'on' : '') + '" onclick="btSetTab(\'' + t[0] + '\')">' + t[1] + '</button>').join('') + '</div>';
+  if (btTab === 'j') h += btJournalHtml(b, s);
+  if (btTab === 's') h += btSummaryHtml(b, s);
+  if (btTab === 'p') h += btParamsHtml(b);
+  if (btTab === 'h') h += btHelpHtml();
+  $('#btOne').innerHTML = h;
+  if (btTab === 's') btDrawCurve(s);
+}
+const btFlow = v => v === 'вверх' ? '<span class="fup">▲</span>' : v === 'вниз' ? '<span class="fdn">▼</span>' : '<span class="mut">' + esc(v || '') + '</span>';
+const btYN = v => v === 'да' ? '<span class="up">да</span>' : v === 'нет' ? '<span class="dn">нет</span>' : esc(v || '');
+function btJournalHtml(b, s) {
+  if (!s.rows.length) return '<div class="card empty" style="line-height:1.8"><div class="big">≡</div>Сделок пока нет.<br>' +
+    '<span style="font-size:12.5px">Нажми «+ Сделка» или загрузи свой Excel через «Импорт сделок».</span></div>';
+  const head = ['#', 'Дата', 'Время', 'Сессия', 'ТФ', 'Сторона', 'Д', '4Ч', '1Ч', '15м', 'Структура', 'Вид зоны', 'Топл.', 'Кас.', 'Против', 'Что снято', 'Ур. снятия', 'Свеча',
+    'Вход', 'Стоп', 'Цель', 'Стоп $', 'РР', 'Лотов', '7/7', 'Исход', 'R', 'Результат', '1:1', '1:3', 'Серия', 'Скрин', 'Комментарий'];
+  const rows = s.rows.map(r => {
+    const c = r._c, oc = r.outcome || '';
+    const ocl = oc === 'цель' ? 'up' : oc === 'стоп' ? 'dn' : oc ? 'warn' : '';
+    return '<tr onclick="btOpenRow(\'' + r.id + '\')">' +
+      '<td class="mut">' + r._i + '</td><td>' + btD(r.date) + '</td><td>' + esc(r.time || '') + '</td><td>' + esc(r.sess || '') + '</td><td class="mut">' + esc(r.tf || '') + '</td>' +
+      '<td><span class="pill ' + (r.side === 'лонг' ? 'b' : r.side === 'шорт' ? 's' : '') + '">' + esc(r.side || '—') + '</span></td>' +
+      '<td class="fl">' + btFlow(r.fD) + '</td><td class="fl">' + btFlow(r.f4) + '</td><td class="fl">' + btFlow(r.f1) + '</td><td class="fl">' + btFlow(r.f15) + '</td>' +
+      '<td class="mut">' + esc(r.struct || '') + '</td><td>' + esc(r.zone || '') + '</td><td>' + btYN(r.fuel) + '</td><td class="num">' + esc(r.touch || '') + '</td><td>' + btYN(r.against) + '</td>' +
+      '<td>' + esc(r.swept || '') + '</td><td class="num mut">' + btPx(r.sweptLvl) + '</td><td>' + esc(r.candle || '') + '</td>' +
+      '<td class="num">' + btPx(r.entry) + '</td><td class="num">' + btPx(r.stop) + '</td><td class="num">' + btPx(r.target) + '</td>' +
+      '<td class="num mut">' + btF(c.stopUsd) + '</td><td class="num">' + (c.rr === null ? '—' : nf(c.rr) + 'x') + '</td><td class="num">' + btF(c.lots) + '</td>' +
+      '<td>' + btYN(r.check) + '</td><td class="' + ocl + '">' + esc(oc) + '</td>' +
+      '<td class="num ' + cls(c.r || 0) + '">' + btF(c.r) + '</td><td class="num ' + cls(c.usd || 0) + '" style="font-weight:600">' + btUsd(c.usd) + '</td>' +
+      '<td>' + btYN(r.hit1) + '</td><td>' + btYN(r.hit3) + '</td><td class="num ' + (r._streak >= 3 ? 'dn' : 'mut') + '">' + (r._streak || '') + '</td>' +
+      '<td>' + (r.link ? '<a href="' + esc(r.link) + '" target="_blank" rel="noopener" data-shot="' + esc(r.link) + '" onclick="event.stopPropagation()">📷</a>' : '') + '</td>' +
+      '<td class="cm" title="' + esc(r.comment || '') + '">' + esc(r.comment || '') + '</td></tr>';
+  }).join('');
+  return '<div class="twrap"><table id="btTbl"><thead><tr>' + head.map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<div class="mut" style="font-size:11.5px;margin-top:8px">Нажми на строку, чтобы открыть сделку. Наведи на 📷 — покажу снимок TradingView. Стоп $, РР, лоты, R, результат и серия стопов считаются сами.</div>';
+}
+function btCut(title, rows, keyFn) {
+  const g = {};
+  rows.forEach(r => { const k = keyFn(r); if (k === null || k === undefined || k === '') return; (g[k] = g[k] || []).push(r); });
+  const keys = Object.keys(g);
+  if (!keys.length) return '';
+  const lines = keys.map(k => {
+    const l = g[k], R = l.reduce((s, r) => s + r._c.r, 0), w = l.filter(r => r._c.r > 0).length;
+    const pl = l.filter(r => r._c.r > 0).reduce((s, r) => s + r._c.r, 0), mi = Math.abs(l.filter(r => r._c.r < 0).reduce((s, r) => s + r._c.r, 0));
+    return { k, n: l.length, wr: w / l.length * 100, R, pf: mi > 0 ? pl / mi : (pl > 0 ? Infinity : null), usd: l.reduce((s, r) => s + (r._c.usd || 0), 0) };
+  }).sort((a, b) => b.R - a.R);
+  return '<div class="chartbox"><h2>' + title + '</h2><div class="twrap" style="border:none"><table class="btcut"><thead><tr><th></th><th class="num">Сделок</th><th class="num">Винрейт</th><th class="num">PF</th><th class="num">Итог, R</th><th class="num">Итог, $</th></tr></thead><tbody>' +
+    lines.map(x => '<tr><td>' + esc(x.k) + '</td><td class="num">' + x.n + '</td><td class="num">' + nf(x.wr, 0) + '%</td><td class="num">' + btPF(x.pf) + '</td>' +
+      '<td class="num ' + cls(x.R) + '" style="font-weight:600">' + nf(x.R) + '</td><td class="num ' + cls(x.usd) + '">' + btUsd(x.usd) + '</td></tr>').join('') +
+    '</tbody></table></div></div>';
+}
+function btSummaryHtml(b, s) {
+  if (!s.n) return '<div class="card empty">Итоги появятся, когда у сделок будет заполнен «Исход».</div>';
+  const K = (k, v, c, x) => '<div class="kpi"><div class="k">' + k + '</div><div class="v ' + (c || '') + '">' + v + '</div><div class="x">' + (x || '') + '</div></div>';
+  const zoneKind = r => { const z = (r.zone || '').toLowerCase(); return z.indexOf('сильн') === 0 ? 'Сильные' : z.indexOf('средн') === 0 ? 'Средние' : z.indexOf('красив') === 0 ? 'Красивые' : z ? 'Остальные' : null; };
+  const flowKind = r => (r.side === 'лонг' && r.f4 === 'вверх') || (r.side === 'шорт' && r.f4 === 'вниз') ? 'По потоку 4Ч' :
+    (r.side === 'лонг' && r.f4 === 'вниз') || (r.side === 'шорт' && r.f4 === 'вверх') ? 'Против потока 4Ч' : null;
+  const allFlow = r => {
+    const want = r.side === 'лонг' ? 'вверх' : r.side === 'шорт' ? 'вниз' : null; if (!want) return null;
+    return [r.fD, r.f4, r.f1, r.f15].filter(x => x === want).length + ' из 4 по сделке';
+  };
+  return '<div class="kpis">' +
+    K('Сделок закрыто', s.n, '', s.win + ' цель · ' + s.stop + ' стоп · ' + s.be + ' б/у · ' + (s.part + s.hand) + ' вручную') +
+    K('Винрейт', s.wr === null ? '—' : nf(s.wr, 1) + '%', s.wr >= 50 ? 'up' : 'dn', 'доля сделок в плюс') +
+    K('Профит-фактор', btPF(s.pf), s.pf >= 1 ? 'up' : 'dn', 'плюсы ' + nf(s.plus) + 'R / минусы ' + nf(s.minus) + 'R') +
+    K('Итог', nf(s.R) + 'R', cls(s.R), btUsd(s.usd) + ' · ' + btF(s.pctDep) + '% депозита') +
+    K('Средний плановый РР', s.avgRR === null ? '—' : nf(s.avgRR) + 'x', '', 'по всем сделкам') +
+    K('Худшая серия стопов', s.worst, s.worst >= 4 ? 'dn' : '', 'подряд · ' + nf(-s.worst * btP(b).risk) + '% депо') +
+    K('Дошли до 1:1 / 1:3', btF(s.hit1, 0) + '% / ' + btF(s.hit3, 0) + '%', '', 'куда доходила цена') +
+    K('Чек-лист 7/7', btF(s.check, 0) + '%', s.check >= 90 ? 'up' : s.check < 70 ? 'dn' : 'warn', 'соблюдение правил') +
+    '</div>' +
+    '<div class="chartbox"><h2>Кривая бэктеста, R</h2><canvas id="btCurve" height="220"></canvas></div>' +
+    '<div class="grid btsec" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr))">' +
+    btCut('Поток 4Ч', s.done, flowKind) +
+    btCut('Вид зоны — группы', s.done, zoneKind) +
+    btCut('Сессии', s.done, r => r.sess) +
+    btCut('Что снято перед входом', s.done, r => r.swept) +
+    btCut('Вид зоны', s.done, r => r.zone) +
+    btCut('Цвет свечи входа', s.done, r => r.candle) +
+    btCut('Касание зоны', s.done, r => r.touch ? 'касание ' + r.touch : null) +
+    btCut('Топливо', s.done, r => r.fuel ? 'топливо: ' + r.fuel : null) +
+    btCut('Зона против потока', s.done, r => r.against ? 'против потока: ' + r.against : null) +
+    btCut('Чек-лист 7/7', s.done, r => r.check ? 'чек-лист: ' + r.check : null) +
+    btCut('Совпадение потоков со сделкой', s.done, allFlow) +
+    btCut('Час входа (МСК)', s.done, r => r.time ? r.time.split(':')[0].padStart(2, '0') + ':00' : null) +
+    btCut('Сторона', s.done, r => r.side) +
+    '</div>' +
+    '<div class="card btsec"><h2>Как это читать</h2><ul class="btread">' +
+    '<li>Профит-фактор ниже 1,0 — система в минусе. Смотрю не на винрейт, а на него.</li>' +
+    '<li>Худшая серия стопов — главная цифра для нервов. Пять подряд при риске 0,3 % это −1,5 %, то есть норма.</li>' +
+    '<li>«Чек-лист 7/7» ниже 100 % — проблема не в системе, а в исполнении. Сначала чиню это.</li>' +
+    '<li>Итог против потока 4Ч в минусе, а по потоку в плюсе — правило работает, соблюдаю жёстче.</li>' +
+    '<li>Красивые зоны в минусе — так и должно быть: разрыв без снятия это форма без топлива.</li>' +
+    '<li>Разрез по сессиям показывает, в какое время я зарабатываю, а в какое только отдаю.</li>' +
+    '<li>Доля «дошли до 1:3» ниже 30 % на 30 сделках — проверяю, не ставлю ли цель дальше ближайшей живой 0.5.</li></ul></div>';
+}
+function btDrawCurve(s) {
+  const c = $('#btCurve'); if (!c || !c.getContext) return;
+  const W = Math.max(200, c.parentElement.clientWidth - 32), H = 220, dpr = window.devicePixelRatio || 1;
+  c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px';
+  const x = c.getContext('2d'); if (!x) return; x.scale(dpr, dpr);
+  const pts = [0]; s.done.forEach(r => pts.push(pts[pts.length - 1] + r._c.r));
+  const mn = Math.min(0, ...pts), mx = Math.max(0, ...pts), pad = 38;
+  const X = i => pad + i / Math.max(1, pts.length - 1) * (W - pad - 8), Y = v => 10 + (mx - v) / ((mx - mn) || 1) * (H - 30);
+  x.font = '10px sans-serif'; x.fillStyle = '#5c6a7a'; x.strokeStyle = '#2a3442'; x.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) { const v = mn + (mx - mn) * k / 4, y = Y(v); x.beginPath(); x.moveTo(pad, y); x.lineTo(W - 8, y); x.stroke(); x.fillText(nf(v, 1), 2, y + 3); }
+  x.strokeStyle = '#5c6a7a'; x.setLineDash([4, 4]); x.beginPath(); x.moveTo(pad, Y(0)); x.lineTo(W - 8, Y(0)); x.stroke(); x.setLineDash([]);
+  const up = pts[pts.length - 1] >= 0, col = up ? '#2ea86b' : '#e05260';
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, up ? 'rgba(46,168,107,.28)' : 'rgba(224,82,96,.28)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.beginPath(); pts.forEach((v, i) => i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v))); x.lineTo(X(pts.length - 1), Y(mn)); x.lineTo(X(0), Y(mn)); x.closePath(); x.fillStyle = g; x.fill();
+  x.beginPath(); pts.forEach((v, i) => i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v))); x.strokeStyle = col; x.lineWidth = 2; x.stroke();
+  s.done.forEach((r, i) => { x.beginPath(); x.arc(X(i + 1), Y(pts[i + 1]), 2.6, 0, 7); x.fillStyle = r._c.r > 0 ? '#2ea86b' : r._c.r < 0 ? '#e05260' : '#8b98a8'; x.fill(); });
+  x.fillStyle = '#5c6a7a'; x.fillText('сделка №1', pad, H - 4); x.fillText('№' + s.done.length, W - 40, H - 4);
+}
+function btParamsHtml(b) {
+  const p = btP(b), F = (id, l, v, st, hint) => '<div class="field"><label>' + l + '</label><input id="' + id + '" type="number" step="' + st + '" value="' + v + '">' +
+    (hint ? '<div class="mut" style="font-size:11px;margin-top:3px">' + hint + '</div>' : '') + '</div>';
+  return '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))"><div class="card"><h2>Параметры расчёта</h2>' +
+    '<div class="field"><label>Название</label><input id="btpName" value="' + esc(b.name) + '"></div>' +
+    '<div class="grid" style="grid-template-columns:1fr 1fr;gap:0 12px">' +
+    F('btpDep', 'Депозит, $', p.dep, '100') + F('btpRisk', 'Риск на сделку, %', p.risk, '0.01', 'это ' + btUsd(p.dep * p.risk / 100) + ' на сделку') +
+    F('btpPv', 'Цена 1 $ хода на 1 лот, $', p.pv, '1', 'XAUUSD: 100') + F('btpStep', 'Шаг лота', p.step, '0.01') +
+    F('btpTarget', 'Цель по количеству сделок', p.target, '1') + '</div>' +
+    '<div class="row"><button class="btn pri" onclick="btSaveParams()">Сохранить</button><button class="btn dgr" onclick="btDelete()">Удалить бэктест</button></div></div>' +
+    '<div class="card"><h2>Как считается объём</h2><div class="btins">' +
+    '<p>Лотов = риск в $ ÷ стоп в $ ÷ цену 1 $ хода на лот, округление <b>вниз</b> до шага лота.</p>' +
+    '<p>Округление вниз нужно, чтобы фактический риск никогда не превышал плановый.</p>' +
+    '<p>Стоп в $ для XAUUSD равен разнице цен входа и стопа: вход 4158,9 и стоп 4163,1 дают 4,2 $.</p>' +
+    '<p>Полный лот XAUUSD даёт 100 $ на каждый доллар хода цены — отсюда и 100 в параметрах.</p>' +
+    '<p>R: цель → плановый РР, стоп → −1, безубыток → 0, частичная фиксация и «закрыл руками» → R вручную. Результат, $ = R × лотов × стоп $ × цену хода.</p>' +
+    '<p class="mut">Изменение депозита или риска пересчитает лоты и деньги во всех сделках этого бэктеста. R при этом не меняются.</p></div></div></div>';
+}
+function btSaveParams() {
+  const b = BT.find(x => x.id === btCur); if (!b) return;
+  const v = id => btNum($('#' + id).value);
+  b.name = ($('#btpName').value || '').trim() || b.name;
+  b.params = { dep: v('btpDep') || 0, risk: v('btpRisk') || 0, pv: v('btpPv') || 100, step: v('btpStep') || 0.01, target: Math.max(1, Math.round(v('btpTarget') || 30)) };
+  saveBT(); renderBT(); toast('Параметры сохранены — всё пересчитано');
+}
+function btHelpHtml() {
+  const H = [
+    ['С чего начать', ['1. Открываю «Параметры» и ставлю свой депозит и риск в процентах. Больше туда не возвращаюсь.',
+      '2. Открываю «Журнал» и нажимаю «+ Сделка». Одна сделка — одна запись.',
+      '3. Свой Excel-файл можно загрузить кнопкой «Импорт сделок» — всё перенесётся, формулы пересчитаются сами.']],
+    ['Что заполняю, а что считается само', ['Руками заполняю поля ввода и кнопки в форме сделки.',
+      'Само считается: «Стоп, $», «РР», «Лотов», «R», «Результат, $» и «серия стопов». Их видно в серой плашке прямо в форме.',
+      'В полях «Вид зоны» и «Что снято» есть готовые варианты. Нужного нет — вписываю своё: список подсказывает, а не запрещает.']],
+    ['Колонка за колонкой', [
+      '<b>Дата и Время МСК</b> — момент ВХОДА, а не момент, когда заметил сетап. Время по Москве.',
+      '<b>Сессия</b> — Азия примерно 03:00–11:00, Европа 10:00–18:30, Америка 15:30–00:00 по Москве. Если вход попал на стык — ставлю ту сессию, которая только что открылась. Если поле пустое, дневник подставит сессию по времени сам.',
+      '<b>ТФ входа</b> — таймфрейм, на котором стояла цветная свеча входа: М1, 5м или 15м. Не таймфрейм анализа.',
+      '<b>Сторона</b> — лонг или шорт.',
+      '<b>Поток Д, 4Ч, 1Ч, 15м</b> — четыре стрелки из плашки потока в момент входа. Списываю как есть, не толкую. Прочерк в плашке — ставлю «—».',
+      '<b>Структура</b> — что индикатор написал ПЕРЕД входом, последние события подряд. Например «пробой ↑ · пробой ↑ · слом ↓». Кнопки под полем добавляют события по порядку.',
+      '<b>Вид зоны</b> — первые слова подписи в коробке: Сильный продавец, Разворотная зона и так далее. Приписки идут в отдельные поля.',
+      '<b>Топливо</b> — есть ли в подписи «· топливо»: да или нет.',
+      '<b>Касание</b> — цифра из приписки «· касание N». Приписки нет — касание первое, ставлю 1.',
+      '<b>Зона против потока</b> — есть ли приписка «· против потока». Если да — вход был запрещён, и это надо честно отметить.',
+      '<b>Что снято</b> — какая ликвидность была снята ПЕРЕД входом: приманка, полка, уровень. Самое важное поле. Если «ничего не снято» — сделка в зачёт не идёт, но записать её всё равно нужно: это и есть материал для разбора.',
+      '<b>Уровень снятия</b> — цена снятого уровня, чтобы потом найти это место на картинке.',
+      '<b>Цвет свечи входа</b> — цвет ЗАКРЫТОЙ свечи, по которой вошёл. Бледный предпросмотр не считается.',
+      '<b>Вход, Стоп, Цель</b> — три цены. Вход — закрытие цветной свечи. Стоп — за дальний край зоны и за полосу стопов, а не за тень свечи. Цель — цена с подписи ближайшей живой 0.5.',
+      '<b>Чек-лист 7/7</b> — все семь пунктов были «да»? Отвечаю честно. Если итог в минусе, а тут много «нет» — проблема в исполнении, а не в системе.',
+      '<b>Исход</b> — цель, стоп, безубыток, частичная фиксация или закрыл руками.',
+      '<b>R вручную</b> — заполняю ТОЛЬКО для «частичная фиксация» или «закрыл руками»: сколько риск-единиц получилось по факту, например 1,4. Для цели, стопа и безубытка не трогаю — R посчитается сам.',
+      '<b>Дошла до 1:1 и 1:3</b> — доходила ли цена до этих целей, даже если закрылся раньше или вылетел по стопу. Смотрю по графику после сделки. Ради этого замера бэктест и делается.',
+      '<b>Ссылка на TradingView</b> — на графике Alt+S или «Снимок» → «Копировать ссылку на изображение» → вставить сюда. В журнале при наведении на 📷 покажется сам снимок.',
+      '<b>Комментарий</b> — что сделал правильно или где ошибся.']],
+    ['Правила, без которых журнал бесполезен', ['Паспорт сделки пишется ДО входа. Если строку заполнить нечем — сделки нет.',
+      'Сделку записываю, даже если она в стоп. Журнал без стопов — не журнал, а витрина.',
+      'Записываю и те сетапы, которые пропустил по чек-листу: исход «закрыл руками» и причина в комментарии. Это самая полезная статистика из всех.',
+      'Не правлю задним числом цены входа и стопа «как надо было». Журнал про то, что было, а не про то, что хотелось.']],
+    ['Что смотрю в конце', ['«Итоги» собираются сами. Главные три цифры: профит-фактор, худшая серия стопов и доля «чек-лист 7/7».',
+      'Дальше смотрю разрезы: по потоку 4Ч, по виду зоны, по сессиям, по тому, что снято. Они показывают, где система работает, а где я сам себе мешаю.',
+      'Задача не заработать на истории, а научиться видеть связку и считать объём не задумываясь.']]
+  ];
+  return '<div class="card btins" style="max-width:980px"><h2>Как заполнять бэктест</h2><p>Тридцать сделок по истории XAUUSD. Одна сделка — одна запись.</p>' +
+    H.map(x => '<h3>' + x[0] + '</h3>' + x[1].map(p => '<p>' + p + '</p>').join('')).join('') + '</div>';
+}
+
+/* ---------- форма сделки ---------- */
+function btSessOf(t) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); if (!m) return '';
+  const v = +m[1] * 60 + +m[2];
+  return v >= 930 ? 'Америка' : v >= 600 ? 'Европа' : v >= 180 ? 'Азия' : 'Америка';
+}
+let btForm = {};
+function btOpenRow(id) {
+  const b = BT.find(x => x.id === btCur); if (!b) return;
+  btEdit = id || null;
+  const r = id ? (b.rows.find(x => x.id === id) || {}) : {};
+  const last = btRows(b).slice(-1)[0];
+  btForm = Object.assign({ date: last ? last.date : dOnly(Date.now()), tf: 'М1' }, JSON.parse(JSON.stringify(r)));
+  $('#btmTitle').textContent = id ? 'Сделка бэктеста · ' + btD(r.date) + ' ' + (r.time || '') : 'Новая сделка бэктеста';
+  $('#btmDel').style.display = id ? '' : 'none';
+  $('#btmDup').style.display = id ? '' : 'none';
+  btRenderForm();
+  $('#btMask').classList.add('on');
+}
+function btClose() { $('#btMask').classList.remove('on'); }
+function btSeg(k, opts, cl) {
+  return '<div class="seg2" data-seg="' + k + '">' + opts.map(o => '<button type="button" data-v="' + esc(o) + '" class="' + (btForm[k] === o ? 'on ' : '') + (cl ? cl(o) : '') + '">' + esc(o) + '</button>').join('') + '</div>';
+}
+function btIn(k, l, opts, ph) {
+  const lid = opts ? 'btdl_' + k : '';
+  return '<div class="field"><label>' + l + '</label><input data-k="' + k + '" autocomplete="off" ' + (lid ? 'list="' + lid + '" ' : '') +
+    'value="' + esc(btForm[k] == null ? '' : btForm[k]) + '" placeholder="' + esc(ph || '') + '">' +
+    (lid ? '<datalist id="' + lid + '">' + opts.map(o => '<option value="' + esc(o) + '">').join('') + '</datalist>' : '') + '</div>';
+}
+function btSegF(k, l, opts, cl) { return '<div class="field"><label>' + l + '</label>' + btSeg(k, opts, cl) + '</div>'; }
+const btUD = o => o === 'вверх' || o === 'да' || o === 'лонг' || o === 'цель' ? 'u' : o === 'вниз' || o === 'нет' || o === 'шорт' || o === 'стоп' ? 'd' : '';
+function btUsed(k) { const set = new Set(BT_O[k] || []); BT.forEach(bb => (bb.rows || []).forEach(r => { if (r[k]) set.add(r[k]); })); return [...set]; }
+function btRenderForm() {
+  const f = btForm;
+  $('#btmBody').innerHTML =
+    '<div class="btgrp"><h4>Когда и куда</h4><div class="btg">' +
+    '<div class="field"><label>Дата</label><input data-k="date" type="date" value="' + esc(f.date || '') + '"></div>' +
+    '<div class="field"><label>Время МСК</label><input data-k="time" type="time" value="' + esc(f.time || '') + '"></div>' +
+    btSegF('sess', 'Сессия', BT_O.sess) + btSegF('tf', 'ТФ входа', BT_O.tf) + btSegF('side', 'Сторона', BT_O.side, btUD) + '</div></div>' +
+    '<div class="btgrp"><h4>Поток в момент входа</h4><div class="btg">' +
+    btSegF('fD', 'Поток Д', BT_O.flow, btUD) + btSegF('f4', 'Поток 4Ч', BT_O.flow, btUD) + btSegF('f1', 'Поток 1Ч', BT_O.flow, btUD) + btSegF('f15', 'Поток 15м', BT_O.flow, btUD) + '</div></div>' +
+    '<div class="btgrp"><h4>Зона и структура</h4>' +
+    '<div class="field"><label>Структура — что написал индикатор</label><input data-k="struct" autocomplete="off" value="' + esc(f.struct || '') + '" placeholder="пробой ↑ · пробой ↑ · слом ↓">' +
+    '<div class="chips">' + BT_O.struct.map(s => '<button type="button" data-chip="' + esc(s) + '">+ ' + esc(s) + '</button>').join('') + '<button type="button" data-chip="">очистить</button></div></div>' +
+    '<div class="btg">' + btIn('zone', 'Вид зоны', btUsed('zone'), 'выбери или впиши') + btSegF('fuel', 'Топливо', BT_O.yn, btUD) + btSegF('touch', 'Касание', BT_O.touch) +
+    btSegF('against', 'Зона против потока', BT_O.yn, o => o === 'да' ? 'd' : o === 'нет' ? 'u' : '') + '</div></div>' +
+    '<div class="btgrp"><h4>Ликвидность</h4><div class="btg">' + btIn('swept', 'Что снято', btUsed('swept'), 'выбери или впиши') + btIn('sweptLvl', 'Уровень снятия', null, '4 162,80') + '</div></div>' +
+    '<div class="btgrp"><h4>Вход</h4>' + btSegF('candle', 'Цвет свечи входа', BT_O.candle, o => o[0] === 'Л' ? 'u' : 'd') + '<div class="btg">' +
+    btIn('entry', 'Вход', null, '4 158,90') + btIn('stop', 'Стоп', null, '4 163,10') + btIn('target', 'Цель', null, '4 146,30') + '</div>' +
+    '<div class="btcalc" id="btCalcBox"></div></div>' +
+    '<div class="btgrp"><h4>Итог сделки</h4><div class="btg">' + btSegF('check', 'Чек-лист 7/7', BT_O.yn, btUD) + '</div>' +
+    '<div class="field"><label>Исход</label>' + btSeg('outcome', BT_O.outcome, btUD) + '</div><div class="btg">' +
+    btIn('rMan', 'R вручную', null, 'для частичной / руками') + btSegF('hit1', 'Дошла до 1:1', BT_O.yn, btUD) + btSegF('hit3', 'Дошла до 1:3', BT_O.yn, btUD) + '</div></div>' +
+    '<div class="btgrp"><h4>Разбор</h4>' + btIn('link', 'Ссылка на TradingView', null, 'https://www.tradingview.com/x/…') +
+    '<div class="field"><label>Комментарий</label><textarea data-k="comment" rows="3">' + esc(f.comment || '') + '</textarea></div></div>';
+  const body = $('#btmBody');
+  body.querySelectorAll('[data-k]').forEach(n => n.oninput = () => {
+    btForm[n.dataset.k] = n.value;
+    if (n.dataset.k === 'time' && !btForm.sess && btSessOf(n.value)) { btForm.sess = btSessOf(n.value); btSyncSeg('sess'); }
+    btCalcBoxRender();
+  });
+  body.querySelectorAll('[data-seg]').forEach(g => g.onclick = e => {
+    const bt = e.target.closest('button'); if (!bt) return;
+    const k = g.dataset.seg, v = bt.dataset.v;
+    btForm[k] = btForm[k] === v ? '' : v;
+    btSyncSeg(k); btCalcBoxRender();
+  });
+  body.querySelectorAll('[data-chip]').forEach(c => c.onclick = () => {
+    const v = c.dataset.chip, inp = body.querySelector('[data-k="struct"]');
+    btForm.struct = v ? (btForm.struct ? btForm.struct + ' · ' : '') + v : '';
+    inp.value = btForm.struct;
+  });
+  btCalcBoxRender();
+}
+function btSyncSeg(k) { $$('#btmBody [data-seg="' + k + '"] button').forEach(b => b.classList.toggle('on', b.dataset.v === btForm[k])); }
+function btCalcBoxRender() {
+  const b = BT.find(x => x.id === btCur); if (!b || !$('#btCalcBox')) return;
+  const c = btCalc(b, btForm);
+  $('#btCalcBox').innerHTML =
+    '<div><span>Риск</span><b>' + btUsd(c.riskUsd) + '</b></div>' +
+    '<div><span>Стоп, $</span><b>' + btF(c.stopUsd) + '</b></div>' +
+    '<div><span>РР</span><b>' + (c.rr === null ? '—' : nf(c.rr) + 'x') + '</b></div>' +
+    '<div><span>Лотов</span><b>' + btF(c.lots) + '</b></div>' +
+    '<div><span>R</span><b class="' + cls(c.r || 0) + '">' + btF(c.r) + '</b></div>' +
+    '<div><span>Результат</span><b class="' + cls(c.usd || 0) + '">' + btUsd(c.usd) + '</b></div>';
+}
+function btSaveRow() {
+  const b = BT.find(x => x.id === btCur); if (!b) return;
+  const f = btForm;
+  if (!f.date) return toast('Укажи дату входа');
+  if (f.entry && f.stop && btNum(f.entry) === btNum(f.stop)) return toast('Вход и стоп совпадают — проверь цены');
+  const was = btEdit;
+  if (btEdit) { const i = b.rows.findIndex(x => x.id === btEdit); if (i >= 0) b.rows[i] = Object.assign({}, f, { id: btEdit }); }
+  else b.rows.push(Object.assign({}, f, { id: uid() }));
+  saveBT(); btClose(); renderBT(); toast(was ? 'Сделка обновлена' : 'Сделка добавлена');
+}
+function btDelRow() {
+  const b = BT.find(x => x.id === btCur); if (!b || !btEdit) return;
+  if (!confirm('Удалить эту сделку из бэктеста?')) return;
+  b.rows = b.rows.filter(x => x.id !== btEdit); saveBT(); btClose(); renderBT(); toast('Сделка удалена');
+}
+function btDupRow() {
+  btEdit = null;
+  ['outcome', 'rMan', 'hit1', 'hit3', 'link', 'comment', 'entry', 'stop', 'target', 'time', 'id'].forEach(k => delete btForm[k]);
+  $('#btmTitle').textContent = 'Новая сделка (копия)'; $('#btmDel').style.display = 'none'; $('#btmDup').style.display = 'none';
+  btRenderForm(); toast('Копия: поток, зона и сессия перенесены — впиши цены и исход');
+}
+
+/* ---------- снимок TradingView при наведении ---------- */
+function btShotUrl(link) {
+  const m = /tradingview\.com\/x\/([A-Za-z0-9]+)/.exec(link || ''); if (!m) return null;
+  return 'https://s3.tradingview.com/snapshots/' + m[1][0].toLowerCase() + '/' + m[1] + '.png';
+}
+document.addEventListener('mouseover', e => {
+  const a = e.target.closest ? e.target.closest('[data-shot]') : null;
+  let img = document.getElementById('btShot');
+  if (!a) { if (img) img.style.display = 'none'; return; }
+  const u = btShotUrl(a.dataset.shot); if (!u) return;
+  if (!img) { img = document.createElement('img'); img.id = 'btShot'; img.className = 'btshot'; img.onerror = () => { img.style.display = 'none'; }; document.body.appendChild(img); }
+  if (img.getAttribute('src') !== u) img.src = u;
+  img.style.display = 'block';
+  const r = a.getBoundingClientRect(), w = Math.min(520, window.innerWidth - 20);
+  img.style.width = w + 'px';
+  img.style.left = Math.max(10, Math.min(window.innerWidth - w - 10, r.left - w / 2)) + 'px';
+  img.style.top = (r.top > window.innerHeight / 2 ? Math.max(10, r.top - w * 0.6 - 10) : r.bottom + 10) + 'px';
+});
+
+/* ---------- импорт: .xlsx (без сторонних библиотек) и .csv ---------- */
+async function btUnzip(buf) {
+  const dv = new DataView(buf);
+  let e = buf.byteLength - 22;
+  while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('это не xlsx-файл');
+  const cnt = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const files = {}, td = new TextDecoder();
+  for (let i = 0; i < cnt; i++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    files[td.decode(new Uint8Array(buf, p + 46, nl))] = { method, csize, lho };
+    p += 46 + nl + xl + cl;
+  }
+  return async name => {
+    const f = files[name]; if (!f) return null;
+    const n = dv.getUint16(f.lho + 26, true), x = dv.getUint16(f.lho + 28, true);
+    const data = new Uint8Array(buf, f.lho + 30 + n + x, f.csize);
+    if (f.method === 0) return td.decode(data);
+    if (typeof DecompressionStream === 'undefined') throw new Error('браузер слишком старый для чтения xlsx — сохрани лист «Журнал» как CSV');
+    const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+    return td.decode(out);
+  };
+}
+async function btReadXlsx(buf) {
+  const read = await btUnzip(buf), X = s => new DOMParser().parseFromString(s, 'application/xml');
+  const T = (d, tag) => Array.from(d.getElementsByTagNameNS('*', tag));
+  const wbTxt = await read('xl/workbook.xml'); if (!wbTxt) throw new Error('в архиве нет книги Excel');
+  const wb = X(wbTxt), rels = X((await read('xl/_rels/workbook.xml.rels')) || '<r/>');
+  const rmap = {}; T(rels, 'Relationship').forEach(r => rmap[r.getAttribute('Id')] = r.getAttribute('Target'));
+  const ssTxt = await read('xl/sharedStrings.xml');
+  const ss = ssTxt ? T(X(ssTxt), 'si').map(si => T(si, 't').map(t => t.textContent).join('')) : [];
+  const sheets = {};
+  for (const sh of T(wb, 'sheet')) {
+    const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    const tgt = (rmap[rid] || '').replace(/^\/?xl\//, '').replace(/^\//, '');
+    const txt = await read('xl/' + tgt); if (!txt) continue;
+    const grid = [];
+    T(X(txt), 'row').forEach(row => {
+      const ri = +row.getAttribute('r') - 1, line = grid[ri] = [];
+      T(row, 'c').forEach(c => {
+        const ref = c.getAttribute('r') || '', col = ref.replace(/\d+/g, '').split('').reduce((s, ch) => s * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+        const t = c.getAttribute('t'), v = T(c, 'v')[0];
+        let val = '';
+        if (t === 's') val = v ? ss[+v.textContent] || '' : '';
+        else if (t === 'inlineStr') val = T(c, 't').map(x => x.textContent).join('');
+        else if (t === 'str' || t === 'e') val = v ? v.textContent : '';
+        else if (t === 'b') val = v && v.textContent === '1' ? 'да' : 'нет';
+        else val = v ? +v.textContent : '';
+        line[col] = val;
+      });
+    });
+    sheets[sh.getAttribute('name')] = grid;
+  }
+  return sheets;
+}
+function btParseCSV(txt) {
+  txt = txt.replace(/^﻿/, '');
+  const first = txt.split('\n')[0];
+  const sep = first.indexOf('\t') >= 0 ? '\t' : (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
+  const out = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < txt.length; i++) {
+    const ch = txt[i];
+    if (q) { if (ch === '"') { if (txt[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur.replace(/\r$/, '')); out.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur); out.push(row); }
+  return out;
+}
+function btCellDate(v) {
+  if (typeof v === 'number') return v > 20000 ? dOnly(Math.round((v - 25569) * 864e5)) : '';
+  const s = String(v || '').trim(); let m;
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) return m[1] + '-' + P2(+m[2]) + '-' + P2(+m[3]);
+  if ((m = /^(\d{1,2})[.,\/-](\d{1,2})[.,\/-](\d{2,4})/.exec(s))) return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + P2(+m[2]) + '-' + P2(+m[1]);
+  return '';
+}
+function btCellTime(v) {
+  if (typeof v === 'number') { const mins = Math.round((v % 1) * 1440); return P2(Math.floor(mins / 60) % 24) + ':' + P2(mins % 60); }
+  const m = /(\d{1,2}):(\d{2})/.exec(String(v || '')); return m ? P2(+m[1]) + ':' + m[2] : '';
+}
+function btGridToRows(grid) {
+  let hi = -1;
+  for (let i = 0; i < Math.min(grid.length, 15); i++) {
+    const r = (grid[i] || []).map(x => String(x == null ? '' : x).trim().toLowerCase());
+    if (r.indexOf('вход') >= 0 && r.indexOf('стоп') >= 0) { hi = i; break; }
+  }
+  if (hi < 0) throw new Error('не нашёл строку заголовков (колонки «Вход» и «Стоп»)');
+  const H = (grid[hi] || []).map(x => String(x == null ? '' : x).trim().toLowerCase()), map = {};
+  BT_COLS.forEach(c => {
+    if (c[0][0] === '_') return;
+    const names = [c[1].toLowerCase()].concat(c.slice(2));
+    let idx = H.findIndex(h => names.indexOf(h) >= 0);
+    if (idx < 0) idx = H.findIndex(h => names.some(n => n.length > 3 && h.indexOf(n) === 0));
+    if (idx >= 0) map[c[0]] = idx;
+  });
+  const rows = [];
+  for (let i = hi + 1; i < grid.length; i++) {
+    const g = grid[i] || [], get = k => map[k] === undefined ? '' : g[map[k]];
+    const date = btCellDate(get('date')), entry = get('entry');
+    if (!date || entry === '' || entry == null) continue;          // строки-примеры и пустые шаблонные строки пропускаем
+    const r = { id: uid(), date, time: btCellTime(get('time')) };
+    ['sess', 'tf', 'side', 'fD', 'f4', 'f1', 'f15', 'struct', 'zone', 'fuel', 'touch', 'against', 'swept', 'candle', 'check', 'outcome', 'hit1', 'hit3', 'link', 'comment'].forEach(k => {
+      const v = get(k); r[k] = v == null ? '' : String(v).trim();
+    });
+    ['sweptLvl', 'entry', 'stop', 'target', 'rMan'].forEach(k => { const v = btNum(get(k)); r[k] = v === null ? '' : String(v).replace('.', ','); });
+    if (r.touch && !isNaN(+r.touch)) r.touch = String(Math.round(+r.touch));
+    rows.push(r);
+  }
+  return rows;
+}
+function btGridParams(grid) {
+  const p = {};
+  (grid || []).forEach(r => {
+    const k = String((r || [])[0] || '').toLowerCase(), v = (r || [])[1];
+    if (v === '' || v == null) return;
+    const n = btNum(v);
+    if (n === null) return;
+    if (k.indexOf('депозит') === 0) p.dep = n;
+    else if (k.indexOf('риск на сделку, %') === 0) p.risk = typeof v === 'number' && v < 1 ? +(v * 100).toFixed(4) : n;
+    else if (k.indexOf('цена 1') === 0) p.pv = n;
+    else if (k.indexOf('шаг лота') === 0) p.step = n;
+  });
+  return p;
+}
+let btImportMode = 'new';
+function btImportNew() { btImportMode = 'new'; $('#btFile').value = ''; $('#btFile').click(); }
+function btImportInto() { btImportMode = 'into'; $('#btFile').value = ''; $('#btFile').click(); }
+async function btParseFile(file) {
+  let rows, params = {};
+  if (/\.xlsx$/i.test(file.name)) {
+    const sheets = await btReadXlsx(await file.arrayBuffer());
+    const names = Object.keys(sheets);
+    const jn = names.find(n => /журнал/i.test(n)) || names.find(n => { try { btGridToRows(sheets[n]); return true; } catch (e) { return false; } });
+    if (!jn) throw new Error('в файле нет листа с колонками «Вход» и «Стоп»');
+    rows = btGridToRows(sheets[jn]);
+    const pn = names.find(n => /параметр/i.test(n));
+    if (pn) params = btGridParams(sheets[pn]);
+  } else rows = btGridToRows(btParseCSV(await file.text()));
+  return { rows, params };
+}
+async function btImportFile(file) {
+  try {
+    const { rows, params } = await btParseFile(file);
+    if (!rows.length) throw new Error('сделок с датой и ценой входа не нашлось');
+    if (btImportMode === 'into' && btCur) {
+      const b = BT.find(x => x.id === btCur);
+      const sig = r => r.date + ' ' + (r.time || '') + ' ' + btNum(r.entry);
+      const have = new Set((b.rows || []).map(sig));
+      const fresh = rows.filter(r => !have.has(sig(r)));
+      if (!confirm('В файле ' + rows.length + ' сделок, новых из них: ' + fresh.length + '. Добавить в «' + b.name + '»?')) return;
+      b.rows = (b.rows || []).concat(fresh); saveBT(); renderBT(); toast('Добавлено сделок: ' + fresh.length);
+    } else {
+      const name = file.name.replace(/\.(xlsx|csv|tsv|txt)$/i, '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+      const b = { id: uid(), name, created: Date.now(), params: Object.assign(BT_DEF(), params), rows };
+      const s = btStats(b);
+      if (!confirm('Файл «' + file.name + '»:\n' + rows.length + ' сделок · депозит ' + nf(btP(b).dep, 0) + ' $ · риск ' + nf(btP(b).risk) + '%\n' +
+        'итог ' + nf(s.R) + 'R · ' + btUsd(s.usd) + ' · винрейт ' + (s.wr === null ? '—' : nf(s.wr, 1) + '%') + '\n\nСоздать бэктест?')) return;
+      BT.unshift(b); saveBT(); go('bt'); btOpen(b.id); toast('Бэктест загружен: ' + rows.length + ' сделок');
+    }
+  } catch (e) { alert('Не получилось прочитать файл: ' + (e.message || e)); }
+}
+function btExport() {
+  const b = BT.find(x => x.id === btCur); if (!b) return;
+  const q = v => { const s = v == null ? '' : String(v); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const n2 = v => v === null || v === undefined ? '' : String(Math.round(v * 1000) / 1000).replace('.', ',');
+  const lines = [BT_COLS.map(c => q(c[1])).join(';')];
+  btRows(b).forEach(r => {
+    const c = r._c;
+    lines.push(BT_COLS.map(col => {
+      const k = col[0];
+      if (k === 'n') return r._i;
+      if (k === 'date') return r.date ? r.date.slice(8, 10) + '.' + r.date.slice(5, 7) + '.' + r.date.slice(0, 4) : '';
+      if (k === '_stopUsd') return n2(c.stopUsd);
+      if (k === '_rr') return n2(c.rr);
+      if (k === '_lots') return n2(c.lots);
+      if (k === '_r') return n2(c.r);
+      if (k === '_usd') return n2(c.usd === null ? null : Math.round(c.usd * 100) / 100);
+      if (k === '_streak') return r._streak || 0;
+      return q(r[k]);
+    }).join(';'));
+  });
+  const p = btP(b);
+  lines.push('', 'Параметры', 'Депозит, $;' + p.dep, 'Риск на сделку, %;' + String(p.risk).replace('.', ','), 'Цена 1 $ хода на 1 лот, $;' + p.pv, 'Шаг лота;' + String(p.step).replace('.', ','));
+  dl(b.name.replace(/[\\\/:*?"<>|]/g, '_') + '.csv', '﻿' + lines.join('\r\n'), 'text/csv');
+  toast('Файл скачан — открывается в Excel');
+}
+$('#btFile').onchange = e => { if (e.target.files[0]) btImportFile(e.target.files[0]); };
+
 /* ---------------- nav / init ---------------- */
 let currentPage = 'dash', jvCur = 'help';
 function jView(v) {
@@ -5214,6 +5931,7 @@ function go(p) {
   if (p === 'stats') renderStats();
   if (p === 'dash') renderDash();
   if (p === 'circ') renderCirc();
+  if (p === 'bt') renderBT();
   if (p === 'kb') renderKB();
   if (p === 'journal') { renderJournal(); jView('help'); }   // вход в раздел всегда начинается с инструкции
 }
@@ -5227,7 +5945,7 @@ function renderAll() {
   refreshSelects(); renderAccounts();
   const st = accStats(S);
   $('#accInfo').innerHTML = nTrades(st.n) + ' · <span class="' + cls(st.net) + '">' + nf(st.eq) + ' ' + S.currency + '</span>';
-  renderDash(); renderTrades(); renderStats(); renderJournal(); renderCirc(); fillSettings();
+  renderDash(); renderTrades(); renderStats(); renderJournal(); renderCirc(); renderBT(); fillSettings();
 }
 
 $('#nav').onclick = e => { const b = e.target.closest('button'); if (b) go(b.dataset.p); };
