@@ -108,6 +108,45 @@ tbody tr{cursor:pointer}
 
 /* ---------- charts ---------- */
 .chartbox{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+/* дашборд: слева золото и кривая, справа календарь */
+.dashtop{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:12px;align-items:stretch}
+@media(max-width:1250px){.dashtop{grid-template-columns:1fr}}
+.calbox{display:flex;flex-direction:column;min-height:420px}
+.segm{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.segm button{padding:4px 10px;font-size:11.5px;color:var(--tx2);background:var(--bg)}
+.segm button.on{background:var(--bg3);color:var(--tx)}
+.calhead{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:6px 0 8px;border-bottom:1px solid var(--line)}
+.calnav{display:flex;align-items:center;gap:6px}
+.calnav b{min-width:118px;text-align:center;font-size:14px}
+.calnav button{width:28px;height:28px;border-radius:7px;font-size:16px;color:var(--tx2)}
+.calnav button:hover{background:var(--bg3);color:var(--tx)}
+.calsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.calsum div b{display:block;font-size:14.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.calsum div span{font-size:10.5px;color:var(--tx3)}
+.calgrid{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(58px,1fr);gap:2px;margin-top:4px}
+.calgrid .cdow{font-size:10.5px;color:var(--tx3);text-align:center;padding:4px 0;grid-row:auto;min-height:0;text-transform:lowercase}
+.cday{background:var(--bg3);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 0 0;min-width:0;overflow:hidden;position:relative}
+.cday.out{opacity:.45}
+.cday.today{box-shadow:inset 0 0 0 1px var(--acc)}
+.cday .cn{font-size:12px;color:var(--tx2);line-height:20px;min-width:24px;text-align:center}
+.cday.w .cn,.cday.l .cn{border-radius:5px;padding:0 5px;font-weight:600}
+.cday.w .cn{color:#9be7bd;border:1px solid var(--up)}
+.cday.l .cn{color:#f3a3ab;border:1px solid var(--dn)}
+.cday .cv{width:100%;text-align:center;font-size:11.5px;font-weight:600;padding:7px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.cday.w .cv{background:#1f6b3f;color:#e8fff1}
+.cday.l .cv{background:#6b2630;color:#ffe9ec}
+.cday.z .cv{background:#3a4452}
+.cday.has{cursor:pointer}
+.cday.has:hover{filter:brightness(1.18)}
+@media(max-width:560px){
+  .calhead{grid-template-columns:1fr}
+  .calnav{justify-content:center}
+  .calsum{grid-template-columns:repeat(2,1fr)}
+  .calgrid{grid-auto-rows:minmax(50px,1fr)}
+  .cday .cv{font-size:9.5px;padding:5px 1px}
+  .cday .cn{font-size:11px}
+  .calbox{min-height:0}
+}
 canvas{display:block;width:100%}
 .bars .b{margin-bottom:9px}
 .bars .lb{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
@@ -490,7 +529,8 @@ canvas{cursor:crosshair}
         </div>
       </div>
       <div class="kpis" id="kpis"></div>
-      <div class="grid" style="grid-template-columns:1fr;gap:12px">
+      <div class="dashtop">
+      <div class="grid" style="grid-template-columns:1fr;gap:12px;align-content:start">
         <div class="chartbox" id="liveCard" style="display:none">
           <div class="row" style="justify-content:space-between;align-items:flex-start">
             <div>
@@ -505,6 +545,21 @@ canvas{cursor:crosshair}
           <canvas id="cLive" height="110" style="margin-top:8px"></canvas>
         </div>
         <div class="chartbox"><h2>Кривая капитала</h2><canvas id="cEquity" height="260"></canvas></div>
+      </div>
+        <div class="chartbox calbox" id="calBox">
+          <div class="row" style="justify-content:space-between;gap:8px;margin-bottom:6px">
+            <h2 style="margin:0">Чистая прибыль / убыток по дням</h2>
+            <div class="segm" id="calMode">
+              <button data-m="acc" class="on" title="Только активный счёт">Этот счёт</button>
+              <button data-m="all" title="Все счета вместе">Все счета</button>
+            </div>
+          </div>
+          <div class="calhead">
+            <div class="calnav"><button onclick="calShift(-1)" title="Предыдущий месяц">«</button><b id="calTitle">—</b><button onclick="calShift(1)" title="Следующий месяц">»</button></div>
+            <div class="calsum" id="calSum"></div>
+          </div>
+          <div class="calgrid" id="calGrid"></div>
+        </div>
       </div>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-top:12px">
         <div class="chartbox"><h2>P&L по дням</h2><canvas id="cDaily" height="200"></canvas></div>
@@ -1429,6 +1484,7 @@ function renderDash() {
     ['Серии', st.bw + ' / ' + st.bl, '', 'побед / поражений подряд']
   ];
   $('#kpis').innerHTML = K.map(k => '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v ' + k[2] + '">' + k[1] + '</div><div class="x">' + k[3] + '</div></div>').join('');
+  renderCal();
   equityChart(st.curve);
   dailyChart(arr);
   const rec = arr.slice().sort((a, b) => new Date(b.closeTime || b.openTime) - new Date(a.closeTime || a.openTime)).slice(0, 8);
@@ -1441,6 +1497,107 @@ function renderDash() {
     (t.setup ? ' · ' + esc(t.setup) : '') + '</div></div>' +
     '<div class="' + cls(t.net) + '" style="font-weight:600;white-space:nowrap">' + money(t.net) + '</div></div>').join('')
     : '<div class="empty">Нет сделок</div>';
+}
+
+/* ---------------- календарь прибыли по дням ---------------- */
+const MON_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+let calY = null, calM = null, calAll = false;
+function calTrades() {
+  if (!calAll) return TR.map(t => Object.assign({ _acc: S.name }, t));
+  const out = [];
+  for (const a of ACC.accounts) {
+    let tr = a.id === S.id ? TR : [];
+    if (a.id !== S.id) { try { tr = JSON.parse(localStorage.getItem(TKEY(a.id))) || []; } catch (e) {} }
+    tr.forEach(t => out.push(Object.assign({ _acc: a.name }, t)));
+  }
+  return out;
+}
+function calShift(k) {
+  calM += k;
+  if (calM < 0) { calM = 11; calY--; } if (calM > 11) { calM = 0; calY++; }
+  renderCal();
+}
+function calNum(v) { return nf(v, Math.abs(v) >= 100 ? 0 : 2); }
+let CALDAYS = {};
+function renderCal() {
+  if (!$('#calGrid')) return;
+  if (calY === null) { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); }
+  const by = {};
+  calTrades().forEach(t => {
+    const k = dOnly(t.closeTime || t.openTime);
+    if (k === 'NaN-NaN-NaN') return;
+    (by[k] = by[k] || []).push(t);
+  });
+  CALDAYS = by;
+  const cur = S.currency === 'USD' ? '$' : S.currency;
+  const first = new Date(Date.UTC(calY, calM, 1));
+  const shift = (first.getUTCDay() + 6) % 7;                    // понедельник — первый
+  const start = Date.UTC(calY, calM, 1 - shift);
+  const daysIn = new Date(Date.UTC(calY, calM + 1, 0)).getUTCDate();
+  const weeks = Math.ceil((shift + daysIn) / 7);
+  const n = new Date(), todayK = n.getFullYear() + '-' + P2(n.getMonth() + 1) + '-' + P2(n.getDate());
+  let h = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'].map(d => '<div class="cdow">' + d + '</div>').join('');
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = new Date(start + i * 864e5), k = dOnly(d), list = by[k] || [];
+    const net = list.reduce((s, t) => s + (+t.net || 0), 0);
+    const c = !list.length ? '' : net > 0 ? ' w has' : net < 0 ? ' l has' : ' z has';
+    h += '<div class="cday' + c + (d.getUTCMonth() !== calM ? ' out' : '') + (k === todayK ? ' today' : '') + '" data-k="' + k + '"' +
+      (list.length ? ' onclick="calOpen(\'' + k + '\')"' : '') + '>' +
+      '<span class="cn">' + d.getUTCDate() + '</span>' +
+      (list.length ? '<div class="cv">' + calNum(net) + ' ' + cur + ' (' + list.length + ')</div>' : '<div></div>') + '</div>';
+  }
+  const g = $('#calGrid');
+  g.innerHTML = h;
+  g.style.gridTemplateRows = 'auto repeat(' + weeks + ', minmax(0,1fr))';
+  // итоги месяца
+  const mk = calY + '-' + P2(calM + 1);
+  let inc = 0, loss = 0, days = 0;
+  Object.keys(by).forEach(k => {
+    if (k.slice(0, 7) !== mk) return;
+    days++;
+    by[k].forEach(t => { const v = +t.net || 0; if (v > 0) inc += v; else loss += v; });
+  });
+  const net = inc + loss;
+  $('#calTitle').textContent = MON_RU[calM] + ' ' + calY;
+  $('#calSum').innerHTML =
+    '<div><b class="up">' + calNum(inc) + ' ' + cur + '</b><span>Доход</span></div>' +
+    '<div><b class="dn">' + calNum(loss) + ' ' + cur + '</b><span>Убыток</span></div>' +
+    '<div><b class="' + cls(net) + '">' + calNum(net) + ' ' + cur + '</b><span>Чистая прибыль</span></div>' +
+    '<div><b class="' + cls(net) + '">' + (days ? calNum(net / days) + ' ' + cur : '—') + '</b><span>Средн. за торговый день</span></div>';
+  $$('#calMode button').forEach(b => b.classList.toggle('on', (b.dataset.m === 'all') === calAll));
+}
+function calTip(k) {
+  const list = (CALDAYS[k] || []).slice().sort((a, b) => tTime(a) - tTime(b));
+  const net = list.reduce((s, t) => s + (+t.net || 0), 0);
+  const w = list.filter(t => t.net > 0).length;
+  let h = '<b>' + dFull(k + 'T00:00:00Z') + '</b> · <span class="' + cls(net) + '">' + money(net) + '</span>' +
+    '<br><span class="mut">' + list.length + ' ' + plural(list.length, ['сделка', 'сделки', 'сделок']) + ' · ' + w + ' в плюс, ' + (list.length - w) + ' в минус</span>';
+  list.slice(0, 12).forEach(t => {
+    const d = new Date(t.closeTime || t.openTime);
+    h += '<br>' + P2(d.getUTCHours()) + ':' + P2(d.getUTCMinutes()) + ' · ' + esc(t.symbol || '') + ' ' + (t.side === 'buy' ? 'BUY' : 'SELL') +
+      (t.volume ? ' ' + nf(t.volume) : '') + (calAll ? ' <span class="mut">· ' + esc(t._acc) + '</span>' : '') +
+      ' · <span class="' + cls(t.net) + '">' + money(+t.net || 0) + '</span>';
+  });
+  if (list.length > 12) h += '<br><span class="mut">…и ещё ' + (list.length - 12) + '</span>';
+  return h + '<br><span class="mut">нажми — откроются сделки этого дня</span>';
+}
+function calHover(e) {
+  const tip = $('#tip'), c = e.target.closest ? e.target.closest('.cday.has') : null;
+  if (!c) { tip.classList.remove('on', 'wide'); return; }
+  tip.innerHTML = calTip(c.dataset.k);
+  tip.classList.add('on', 'wide');
+  const r = c.getBoundingClientRect();
+  const left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 10, r.left + r.width / 2 - tip.offsetWidth / 2));
+  let top = r.top + window.scrollY - tip.offsetHeight - 8;
+  if (top < window.scrollY + 6) top = r.bottom + window.scrollY + 8;
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
+}
+function calOpen(k) {
+  $('#tip').classList.remove('on', 'wide');
+  $('#qFrom').value = k; $('#qTo').value = k;
+  tPage = 1;
+  go('trades'); renderTrades();
+  if (calAll) toast('Показаны сделки активного счёта «' + S.name + '» за этот день');
 }
 
 /* ---------------- render: trades ---------------- */
@@ -5124,6 +5281,9 @@ $('#r_day').onchange = rScope;
 $('#r_week').onchange = rScope;
 $('#r_opts').onclick = e => { if (e.target.classList.contains('tag')) e.target.classList.toggle('on'); };
 $('#fPeriod').onchange = renderDash;
+$('#calGrid').addEventListener('mousemove', calHover);
+$('#calGrid').addEventListener('mouseleave', () => $('#tip').classList.remove('on', 'wide'));
+$$('#calMode button').forEach(b => b.onclick = () => { calAll = b.dataset.m === 'all'; renderCal(); });
 ['#qText', '#qSym', '#qSide', '#qRes', '#qSetup', '#qFrom', '#qTo'].forEach(s => {
   const reset = () => { tPage = 1; renderTrades(); };
   $(s).oninput = reset; $(s).onchange = reset;
