@@ -4300,6 +4300,8 @@ function renderGS() {
   if (gsErr === 'nodrive') warn = '<div class="note" style="margin-bottom:12px">Бэктесты хранятся на твоём Google Диске. Сначала подключи Диск: <b>Настройки → Google Диск</b>. <button class="btn sm" onclick="go(\'settings\')">Открыть настройки</button></div>';
   else if (gsErr === 'oldscript') warn = '<div class="note" style="margin-bottom:12px;border-left-color:var(--warn)"><b>Нужно обновить код скрипта Google.</b> Старая версия не умеет работать с таблицами бэктестов. ' +
     'Открой <a href="#" onclick="openGdHelp();return false">инструкцию</a>, скопируй новый код, вставь вместо старого, затем <b>Развернуть → Управление развертываниями → ✏️ → Версия: новая → Развернуть</b>. Адрес останется прежним. ' +
+    '<br><span class="mut">Дневник сейчас обращается к адресу, который заканчивается на <b style="color:var(--tx)">…' + esc(String(SY.gdUrl || '').replace(/\/exec.*$/, '').slice(-10)) + '/exec</b>. ' +
+    'Сравни с «URL вебдодатку» в новом проекте (Ввести в дію → Керувати введеннями в дію). Если концы разные — вставь новый адрес в Настройки → Google Диск.</span> ' +
     '<button class="btn sm" onclick="gsRefresh()">Проверить снова</button></div>';
   else if (gsErr) warn = '<div class="note" style="margin-bottom:12px;border-left-color:var(--dn)">Не получилось связаться с Диском: ' + esc(gsErr) + ' <button class="btn sm" onclick="gsRefresh()">Повторить</button></div>';
   const here = gsHere(), trail = gsPath ? gsTrail(gsPath) : [];
