@@ -1761,6 +1761,35 @@ function calOpen(k) {
   if (calAll) toast('Показаны сделки активного счёта «' + S.name + '» за этот день');
 }
 
+/* Метка закрытия: плюс — TP (при частичном закрытии одной позиции — TP1, TP2…), минус — SL, около нуля — БУ.
+   Как именно закрылось (тейк, перенесённый стоп, вручную) — во всплывающей подсказке. */
+let TAG_PARTS = null;
+function tagParts() {
+  if (TAG_PARTS && TAG_PARTS.src === TR) return TAG_PARTS.map;
+  const g = {}, map = {};
+  TR.forEach(t => { if (t.posId) (g[t.posId] = g[t.posId] || []).push(t); });
+  Object.values(g).forEach(list => {
+    if (list.length < 2) return;
+    let k = 0;
+    list.slice().sort((a, b) => tTime(a) - tTime(b)).forEach(t => { if (+t.net > 0) map[t.id] = ++k; });
+  });
+  TAG_PARTS = { src: TR, map };
+  return map;
+}
+function tradeTag(t) {
+  if (t.closeReason === 'stopout') return ['sl', 'SO'];
+  if (t.closeReason === 'be') return ['be', 'БУ'];
+  if (!t.closeReason && !t.slChk) return null;          // сделка ещё не сверялась с cTrader
+  if (+t.net > 0) { const k = tagParts()[t.id]; return ['tp', 'TP' + (k ? k : '')]; }
+  if (+t.net < 0) return ['sl', 'SL'];
+  return ['be', 'БУ'];
+}
+function tradeTagHtml(t) {
+  const g = tradeTag(t); if (!g) return '';
+  const how = typeof CT_REASON !== 'undefined' && CT_REASON[t.closeReason] ? 'Закрыта ' + CT_REASON[t.closeReason] : '';
+  return '<span class="xr ' + g[0] + '"' + (how ? ' title="' + esc(how) + '"' : '') + '>' + g[1] + '</span>';
+}
+
 /* ---------------- render: trades ---------------- */
 let tPage = 1;
 function renderTrades() {
@@ -1785,7 +1814,7 @@ function renderTrades() {
       '<td><span class="pill ' + (t.side === 'buy' ? 'b' : 's') + '">' + (t.side === 'buy' ? 'BUY' : 'SELL') + '</span></td>' +
       '<td class="num">' + (t.volume != null ? nf(t.volume) : '—') + '</td>' +
       '<td class="num">' + (t.openPrice != null ? nf(t.openPrice, d) : '—') + '</td>' +
-      '<td class="num">' + (CT_TAG[t.closeReason] ? '<span class="xr ' + CT_TAG[t.closeReason][0] + '" title="Закрыта ' + CT_REASON[t.closeReason] + '">' + CT_TAG[t.closeReason][1] + '</span>' : '') + (t.closePrice != null ? nf(t.closePrice, d) : '—') + '</td>' +
+      '<td class="num">' + tradeTagHtml(t) + (t.closePrice != null ? nf(t.closePrice, d) : '—') + '</td>' +
       /* сделка в плюсе — стоп не показываем: она закрыта в прибыль, SL тут не при чём */
       (+t.net > 0 ? '<td class="num mut">—</td>' :
       '<td class="num mut"' + (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? ' title="Начальный стоп ' + nf(t.slInit, d) + ', потом перенесён"' : '') + '>' + (t.sl != null ? nf(t.sl, d) : '—') +
@@ -2852,7 +2881,8 @@ function drawCandles() {
   const iA = Math.max(0, Math.floor(cdView.a)), iB = Math.min(n - 1, Math.ceil(cdView.b));
   const vis = d.slice(iA, iB + 1);
   if (!vis.length) return;
-  const cur = { side: ov.side, vol: ov.vol, entry: ov.entry, exit: ov.exit, tO: ov.tOpen, tC: ov.tClose, net: ov.net, pips: ov.pips, reason: ov.reason, cur: true };
+  const curT = editId ? TR.find(x => x.id === editId) : null, cg = curT ? tradeTag(curT) : null;
+  const cur = { side: ov.side, vol: ov.vol, entry: ov.entry, exit: ov.exit, tO: ov.tOpen, tC: ov.tClose, net: ov.net, pips: ov.pips, reason: ov.reason, tag: cg ? cg[1] : '', cur: true };
   const lv = [cur.entry, cur.exit, ov.sl].concat(ov.tps.map(t => t.price)).filter(v => v != null && !isNaN(v));
   let lo = Math.min(...vis.map(x => x.l)), hi = Math.max(...vis.map(x => x.h));
   lv.forEach(v => { if (v > lo - (hi - lo) * 0.6 && v < hi + (hi - lo) * 0.6) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
@@ -2938,7 +2968,7 @@ function drawCandles() {
       const parts = [buy ? 'Sell' : 'Buy'].concat(vol ? [vol] : [], [t.exit.toFixed(dec)]);
       if (t.net != null && !isNaN(t.net)) parts.push('Net ' + (S.currency || 'USD') + ' ' + nf(t.net));
       if (t.pips != null && !isNaN(t.pips)) parts.push('Pips ' + nf(t.pips, 1));
-      if (CT_TAG[t.reason]) parts.push(CT_TAG[t.reason][1]);
+      if (t.tag) parts.push(t.tag);
       box(x2 + 10, y2, parts, colOut, false);
     }
   };
