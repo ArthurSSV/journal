@@ -4828,7 +4828,7 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
   if (!from && existing.length) from = Math.max(...existing.map(t => new Date(t.closeTime || t.openTime).getTime()).filter(v => v > 0)) - 7 * 864e5;
   if (!from) from = CT.from ? Date.parse(CT.from + 'T00:00:00Z') : Date.now() - 90 * 864e5;
   if (trader.registrationTimestamp) from = Math.max(from, +trader.registrationTimestamp);
-  const to = Date.now() + 60000, deals = [];
+  const to = Date.now() - 1000, deals = [];
   const WEEK = 7 * 864e5;
   for (let a = from; a < to; a += WEEK) {
     if (report) report('счёт ' + esc(acc.name) + ': загружаю сделки с ' + dFull(new Date(a).toISOString()) + '…');
@@ -4842,7 +4842,7 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
   for (const pid of miss.slice(0, 200)) {
     try {
       const cl = closes.find(d => d.positionId === pid);
-      const r = await c.send(CT_PT.DEALS_BY_POS, { ctidTraderAccountId: +ctid, positionId: +pid, fromTimestamp: Math.max(0, +cl.executionTimestamp - 120 * 864e5), toTimestamp: +cl.executionTimestamp });
+      const r = await c.send(CT_PT.DEALS_BY_POS, { ctidTraderAccountId: +ctid, positionId: +pid, fromTimestamp: Math.max(0, +cl.executionTimestamp - 6.9 * 864e5), toTimestamp: Math.min(Date.now() - 1000, +cl.executionTimestamp) });
       (r.deal || []).filter(d => !d.closePositionDetail).forEach(d => { const o = opens[pid]; if (!o || +d.executionTimestamp < +o.executionTimestamp) opens[pid] = d; });
       await ctSleep(250);
     } catch (e) {}
@@ -4941,12 +4941,19 @@ async function ctEnrich(c, ctid, accId, report) {
     if (report) report('стопы и тейки: позиция ' + esc(t.posId) + ' (' + (n + 1) + ' из ' + todo.length + ')');
     try {
       const o1 = ctUnwall(t.openTime || t.closeTime), c1 = ctUnwall(t.closeTime || t.openTime);
-      const q = { ctidTraderAccountId: +ctid, positionId: +String(t.posId).trim(), fromTimestamp: Math.max(0, o1 - 3 * 864e5), toTimestamp: c1 + 3 * 864e5 };
+      /* окно поиска: не в будущем и не длиннее недели — иначе cTrader отвечает INCORRECT_BOUNDARIES */
+      const now = Date.now() - 1000;
+      let to = Math.min(now, c1 + 6 * 36e5), from = Math.max(0, o1 - 6 * 36e5);
+      if (to - from > 6.9 * 864e5) from = to - 6.9 * 864e5;
+      const q = { ctidTraderAccountId: +ctid, positionId: +String(t.posId).trim(), fromTimestamp: Math.floor(from), toTimestamp: Math.floor(to) };
       let r;
       try { r = await c.send(CT_PT.ORDERS_BY_POS, q); }
-      catch (e) {                                   // упёрлись в лимит запросов — ждём и повторяем
-        if (!/BLOCKED|LIMIT|FREQUENCY/i.test(String(e.code || e.message))) throw e;
-        await ctSleep(2500); r = await c.send(CT_PT.ORDERS_BY_POS, q);
+      catch (e) {
+        const code = String(e.code || e.message);
+        if (/BLOCKED|LIMIT|FREQUENCY/i.test(code)) { await ctSleep(2500); r = await c.send(CT_PT.ORDERS_BY_POS, q); }      // лимит запросов — ждём и повторяем
+        else if (/BOUNDAR/i.test(code)) {                                                                                   // ещё уже: только вокруг закрытия
+          r = await c.send(CT_PT.ORDERS_BY_POS, Object.assign({}, q, { fromTimestamp: Math.floor(Math.max(0, c1 - 864e5)), toTimestamp: Math.floor(Math.min(now, c1 + 36e5)) }));
+        } else throw e;
       }
       await ctSleep(260);
       if (!(r.order || []).length) { CT_EMPTY++; t.slChk = 2; continue; }
