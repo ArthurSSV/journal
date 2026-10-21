@@ -416,6 +416,7 @@ canvas{cursor:crosshair}
 .xr{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:4px;margin-right:6px;vertical-align:1px}
 .xr.sl{background:var(--dn-bg);color:var(--dn)}
 .xr.tp{background:var(--up-bg);color:var(--up)}
+.xr.be{background:var(--bg3);color:var(--tx2)}
 .tfbtns{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .tfbtns button{padding:5px 9px;font-size:12px;color:var(--tx2);border-right:1px solid var(--line)}
 .tfbtns button:last-child{border-right:none}
@@ -1784,8 +1785,9 @@ function renderTrades() {
       '<td><span class="pill ' + (t.side === 'buy' ? 'b' : 's') + '">' + (t.side === 'buy' ? 'BUY' : 'SELL') + '</span></td>' +
       '<td class="num">' + (t.volume != null ? nf(t.volume) : '—') + '</td>' +
       '<td class="num">' + (t.openPrice != null ? nf(t.openPrice, d) : '—') + '</td>' +
-      '<td class="num">' + (t.closeReason === 'sl' ? '<span class="xr sl">SL</span>' : t.closeReason === 'tp' ? '<span class="xr tp">TP</span>' : t.closeReason === 'stopout' ? '<span class="xr sl">SO</span>' : '') + (t.closePrice != null ? nf(t.closePrice, d) : '—') + '</td>' +
-      '<td class="num mut">' + (t.sl != null ? nf(t.sl, d) : '—') + '</td>' +
+      '<td class="num">' + (CT_TAG[t.closeReason] ? '<span class="xr ' + CT_TAG[t.closeReason][0] + '" title="Закрыта ' + CT_REASON[t.closeReason] + '">' + CT_TAG[t.closeReason][1] + '</span>' : '') + (t.closePrice != null ? nf(t.closePrice, d) : '—') + '</td>' +
+      '<td class="num mut"' + (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? ' title="Начальный стоп ' + nf(t.slInit, d) + ', потом перенесён"' : '') + '>' + (t.sl != null ? nf(t.sl, d) : '—') +
+        (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? '<div style="font-size:10px;opacity:.6">было ' + nf(t.slInit, d) + '</div>' : '') + '</td>' +
       '<td class="num mut">' + (tps.length ? tps.map(x => nf(x.price, d) + (x.hit ? ' ✓' : '')).join(' / ') : (t.tp != null ? nf(t.tp, d) : '—')) + '</td>' +
       '<td class="num ' + cls(p) + '">' + (p === null ? '—' : nf(p, 1)) + '</td>' +
       '<td class="num ' + cls(r) + '">' + (r === null ? '—' : nf(r) + 'R') + '</td>' +
@@ -2934,7 +2936,7 @@ function drawCandles() {
       const parts = [buy ? 'Sell' : 'Buy'].concat(vol ? [vol] : [], [t.exit.toFixed(dec)]);
       if (t.net != null && !isNaN(t.net)) parts.push('Net ' + (S.currency || 'USD') + ' ' + nf(t.net));
       if (t.pips != null && !isNaN(t.pips)) parts.push('Pips ' + nf(t.pips, 1));
-      if (t.reason === 'sl' || t.reason === 'tp' || t.reason === 'stopout') parts.push(t.reason === 'tp' ? 'TP' : t.reason === 'sl' ? 'SL' : 'Stop out');
+      if (CT_TAG[t.reason]) parts.push(CT_TAG[t.reason][1]);
       box(x2 + 10, y2, parts, colOut, false);
     }
   };
@@ -4934,7 +4936,7 @@ let CT_EMPTY = 0, CT_ERR = '';
 async function ctEnrich(c, ctid, accId, report) {
   const all = ctExisting(accId);
   // все сделки счёта с ID позиции — и загруженные из cTrader, и импортированные из CSV
-  const todo = all.filter(t => /^\d+$/.test(String(t.posId || '').trim()) && (+t.slChk || 0) < 2).slice(-400);
+  const todo = all.filter(t => /^\d+$/.test(String(t.posId || '').trim()) && (+t.slChk || 0) < 3).slice(-400);
   if (!todo.length) return 0;
   let n = 0;
   for (const t of todo) {
@@ -4956,7 +4958,7 @@ async function ctEnrich(c, ctid, accId, report) {
         } else throw e;
       }
       await ctSleep(260);
-      if (!(r.order || []).length) { CT_EMPTY++; t.slChk = 2; continue; }
+      if (!(r.order || []).length) { CT_EMPTY++; t.slChk = 3; continue; }
       const ords = (r.order || []).slice().sort((a, b) => +(b.utcLastUpdateTimestamp || 0) - +(a.utcLastUpdateTimestamp || 0));
       let sl = null, tp = null;
       ords.forEach(o => { if (sl == null && o.stopLoss != null) sl = +o.stopLoss; if (tp == null && o.takeProfit != null) tp = +o.takeProfit; });
@@ -4967,19 +4969,30 @@ async function ctEnrich(c, ctid, accId, report) {
       const closer = (t.orderId && ords.find(o => String(o.orderId) === String(t.orderId))) ||
         ords.find(o => o.closingOrder || ctIsType(o.orderType, 4, 'STOP_LOSS_TAKE_PROFIT'));
       const near = (lvl) => lvl != null && cp != null ? Math.abs(cp - lvl) : Infinity;
-      let why = 'manual';
+      /* Тейк — только если цена дошла до уровня TP. Если сработал стоп-ордер, а цена закрытия в плюсе —
+         это перенесённый стоп (безубыток / трейлинг), а не тейк. */
+      const tolTp = tp != null && op != null ? Math.max(Math.abs(tp - op) * 0.03, (cp || tp) * 0.00005) : 0;
+      const hitTp = tp != null && cp != null && (buy ? cp >= tp - tolTp : cp <= tp + tolTp);
+      const res = op != null && cp != null ? (buy ? cp - op : op - cp) : +t.net;
+      const risk = sl != null && op != null ? Math.abs(op - sl) : null;
+      const beTol = risk ? risk * 0.1 : (cp || 1) * 0.0003;
+      const stopKind = () => res > beTol ? 'slp' : res >= -beTol ? 'be' : 'sl';
+      let why = 'manual', slFinal = sl;
       if (closer && closer.isStopOut) why = 'stopout';
       else if (closer && ctIsType(closer.orderType, 4, 'STOP_LOSS_TAKE_PROFIT')) {
-        if (sl == null && tp == null) { why = +t.net >= 0 ? 'tp' : 'sl'; if (why === 'sl') sl = cp; else tp = cp; }   // уровень не сохранился — берём цену срабатывания
-        else why = near(sl) <= near(tp) ? 'sl' : 'tp';
+        if (hitTp) why = 'tp';
+        else { why = stopKind(); slFinal = closer.stopPrice != null ? +closer.stopPrice : cp; }
       }
       else if (!closer && cp != null) {
         const tol = Math.max(cp * 0.0002, 0.0001);
-        if (near(sl) <= tol) why = 'sl'; else if (near(tp) <= tol) why = 'tp';
+        if (hitTp) why = 'tp'; else if (near(sl) <= tol) why = 'sl';
       }
       const dg = v => v == null ? null : Math.round(v * 1e5) / 1e5;
-      if (sl != null) t.sl = dg(sl); if (tp != null) t.tp = dg(tp); t.closeReason = why; t.slChk = 2;
-      if (why === 'tp' && tp != null && !(t.tps && t.tps.length)) t.tps = [{ price: dg(tp), pct: 100, hit: true }];
+      t.slInit = dg(sl);
+      t.sl = dg(slFinal != null ? slFinal : sl); if (tp != null) t.tp = dg(tp);
+      t.closeReason = why; t.slChk = 3;
+      if (t.tps && t.tps.length === 1 && t.tps[0].pct === 100 && tp != null && Math.abs(t.tps[0].price - tp) < 1e-6) t.tps[0].hit = why === 'tp';
+      else if (why === 'tp' && tp != null && !(t.tps && t.tps.length)) t.tps = [{ price: dg(tp), pct: 100, hit: true }];
       n++;
     } catch (e) { CT_ERR = String(e.code || e.message || e); }
   }
@@ -5045,7 +5058,8 @@ async function loadCandlesCT(ctid) {
     if (ctChart) { try { ctChart.conn.close(); } catch (x) {} ctChart = null; }
   }
 }
-const CT_REASON = { sl: 'по Stop Loss', tp: 'по Take Profit', manual: 'вручную', stopout: 'стоп-аут' };
+const CT_REASON = { sl: 'по Stop Loss', tp: 'по Take Profit', slp: 'по стопу в плюсе (SL был перенесён)', be: 'в безубыток', manual: 'вручную', stopout: 'стоп-аут' };
+const CT_TAG = { sl: ['sl', 'SL'], tp: ['tp', 'TP'], slp: ['tp', 'SL+'], be: ['be', 'БУ'], stopout: ['sl', 'SO'] };
 
 function fillCT() {
   const box = $('#ctAccs'); if (!box) return;
