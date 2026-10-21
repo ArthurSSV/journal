@@ -2811,79 +2811,191 @@ async function loadCandles() {
     if (!data.length) { st.innerHTML = '<span class="dn">Свечей за этот период нет</span>'; return; }
     cdData = data;
     const num = id => { const v = $('#f_' + id).value; return v === '' ? null : +v; };
-    cdOverlay = { entry: num('openPrice'), exit: num('closePrice'), sl: num('sl'), tps: draftTps.filter(x => x.price != null), side: $('#f_side').value, tOpen, tClose, sym };
+    cdOverlay = { entry: num('openPrice'), exit: num('closePrice'), sl: num('sl'), tps: draftTps.filter(x => x.price != null), side: $('#f_side').value, tOpen, tClose, sym, vol: num('volume'), net: num('net'), pips: num('pips') != null ? num('pips') : calcPips({ symbol: sym, side: $('#f_side').value, openPrice: num('openPrice'), closePrice: num('closePrice') }), trades: cdTradesFor(sym, iso => new Date(iso).getTime() - tz) };
+    cdView = null;
     st.innerHTML = '<span class="up">' + data.length + ' свечей · ' + interval + '</span> · время по брокеру UTC' + (QS.tz >= 0 ? '+' : '') + QS.tz;
     drawCandles();
   } catch (e) { st.innerHTML = '<span class="dn">' + esc(String(e.message || e)).slice(0, 70) + '</span>'; }
 }
+/* ---- график сделки в стиле cTrader: чёрный фон, сделки линиями с метками, зум колесом, перетаскивание, перекрестие ---- */
+let cdView = null, cdHover = null, cdDrag = null, cdBound = false;
+const CD_UP = '#2ea043', CD_DN = '#e0562b';
+const MON_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+/* сделки счёта по этому символу — их тоже видно на графике, как в терминале */
+function cdTradesFor(sym, toReal) {
+  const key = String(sym || '').toUpperCase();
+  return TR.filter(t => String(t.symbol || '').toUpperCase() === key && t.id !== editId && t.openPrice != null && t.closePrice != null)
+    .map(t => ({ side: t.side, vol: t.volume, entry: +t.openPrice, exit: +t.closePrice, tO: toReal(t.openTime || t.closeTime), tC: toReal(t.closeTime || t.openTime),
+      net: +t.net, pips: t.pips != null ? +t.pips : calcPips(t), reason: t.closeReason }));
+}
+function cdIdx(t) {                          // индекс свечи, в которую попадает время
+  const d = cdData; let lo = 0, hi = d.length - 1;
+  if (t <= d[0].t) return 0;
+  if (t >= d[hi].t) return hi;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (d[m].t <= t) lo = m; else hi = m; }
+  return lo;
+}
+function cdNice(x) { const p = Math.pow(10, Math.floor(Math.log10(x))), f = x / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
 function drawCandles() {
   if (!cdData || !cdData.length) return;
   const { g, w, h } = ctx('#cCandles', 380);
-  const d = cdData, ov = cdOverlay, tz = ov.tzms != null ? ov.tzms : QS.tz * 36e5, dec = px(ov.sym);
-  const extra = [ov.entry, ov.exit, ov.sl].concat(ov.tps.map(t => t.price)).filter(v => v != null && !isNaN(v));
-  const mn = Math.min(...d.map(x => x.l), ...extra), mx = Math.max(...d.map(x => x.h), ...extra);
-  const sp = (mx - mn) || 1, lo = mn - sp * .06, hi = mx + sp * .06;
-  const pad = { l: 8, r: 74, t: 10, b: 22 };
-  const X = i => pad.l + (w - pad.l - pad.r) * (i + .5) / d.length;
-  const Y = v => pad.t + (h - pad.t - pad.b) * (1 - (v - lo) / (hi - lo));
-  const bw = Math.max(1.5, (w - pad.l - pad.r) / d.length * .62);
-  // сетка и цены справа
-  g.strokeStyle = '#232c38'; g.fillStyle = '#5c6a7a'; g.font = '10.5px sans-serif'; g.textAlign = 'left';
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.t + (h - pad.t - pad.b) * i / 4;
-    g.beginPath(); g.moveTo(pad.l, y); g.lineTo(w - pad.r, y); g.stroke();
-    g.fillText(nf(hi - (hi - lo) * i / 4, dec), w - pad.r + 5, y + 3.5);
+  const d = cdData, ov = cdOverlay, tz = ov.tzms != null ? ov.tzms : QS.tz * 36e5, dec = px(ov.sym), n = d.length;
+  if (!cdView) cdView = { a: -0.5, b: n - 0.5 };
+  const pad = { r: 66, t: 6, b: 22 }, W = w - pad.r, Hh = h - pad.b;
+  g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+  const span = cdView.b - cdView.a, X = i => (i - cdView.a) / span * W;
+  const iA = Math.max(0, Math.floor(cdView.a)), iB = Math.min(n - 1, Math.ceil(cdView.b));
+  const vis = d.slice(iA, iB + 1);
+  if (!vis.length) return;
+  const cur = { side: ov.side, vol: ov.vol, entry: ov.entry, exit: ov.exit, tO: ov.tOpen, tC: ov.tClose, net: ov.net, pips: ov.pips, reason: ov.reason, cur: true };
+  const lv = [cur.entry, cur.exit, ov.sl].concat(ov.tps.map(t => t.price)).filter(v => v != null && !isNaN(v));
+  let lo = Math.min(...vis.map(x => x.l)), hi = Math.max(...vis.map(x => x.h));
+  lv.forEach(v => { if (v > lo - (hi - lo) * 0.6 && v < hi + (hi - lo) * 0.6) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+  const sp = (hi - lo) || 1; lo -= sp * 0.06; hi += sp * 0.06;
+  const Y = v => pad.t + (Hh - pad.t) * (1 - (v - lo) / (hi - lo));
+  // сетка и шкала цен
+  const step = cdNice((hi - lo) / Math.max(4, Math.floor((Hh - pad.t) / 34)));
+  g.font = '11px Arial, sans-serif'; g.textAlign = 'left'; g.lineWidth = 1;
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    const y = Math.round(Y(v)) + 0.5;
+    g.strokeStyle = '#161b22'; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    g.fillStyle = '#c9d1d9'; g.fillText(v.toFixed(Math.max(0, Math.min(dec, 2))), W + 6, y + 4);
   }
-  // зона удержания позиции
-  const i1 = d.findIndex(x => x.t >= ov.tOpen), i2 = d.findIndex(x => x.t >= ov.tClose);
-  if (i1 >= 0) {
-    const a = X(i1), b = i2 >= 0 ? X(i2) : w - pad.r;
-    g.fillStyle = 'rgba(59,130,246,.10)'; g.fillRect(a, pad.t, Math.max(2, b - a), h - pad.t - pad.b);
+  // шкала времени
+  const barMs = n > 1 ? d[1].t - d[0].t : 60000, pxBar = W / span;
+  const kRaw = Math.max(1, Math.ceil(80 / pxBar)), ks = [1, 2, 3, 5, 10, 15, 20, 30, 60, 120, 240, 480, 1440];
+  const k = ks.find(x => x >= kRaw) || kRaw;
+  const tl = t => { const x = new Date(t + tz); return barMs >= 864e5 ? P2(x.getUTCDate()) + ' ' + MON_SHORT[x.getUTCMonth()] : P2(x.getUTCHours()) + ':' + P2(x.getUTCMinutes()); };
+  g.textAlign = 'center';
+  for (let i = iA; i <= iB; i++) {
+    if (Math.round((d[i].t + tz) / barMs) % k) continue;
+    const x = Math.round(X(i)) + 0.5;
+    g.strokeStyle = '#161b22'; g.beginPath(); g.moveTo(x, pad.t); g.lineTo(x, Hh); g.stroke();
+    g.fillStyle = '#c9d1d9'; g.fillText(tl(d[i].t), x, h - 7);
   }
+  // всё, что внутри поля графика, не вылезает на шкалы
+  g.save(); g.beginPath(); g.rect(0, 0, W, Hh); g.clip();
   // свечи
-  d.forEach((k, i) => {
-    const up = k.c >= k.o, col = up ? '#2ea86b' : '#e05260';
-    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1;
-    const x = X(i);
-    g.beginPath(); g.moveTo(x, Y(k.h)); g.lineTo(x, Y(k.l)); g.stroke();
-    const y1 = Y(Math.max(k.o, k.c)), y2 = Y(Math.min(k.o, k.c));
+  const bw = Math.max(1, Math.min(14, pxBar * 0.68));
+  for (let i = iA; i <= iB; i++) {
+    const c = d[i], x = Math.round(X(i)) + 0.5, col = c.c >= c.o ? CD_UP : CD_DN;
+    g.strokeStyle = col; g.fillStyle = col;
+    g.beginPath(); g.moveTo(x, Y(c.h)); g.lineTo(x, Y(c.l)); g.stroke();
+    const y1 = Y(Math.max(c.o, c.c)), y2 = Y(Math.min(c.o, c.c));
     g.fillRect(x - bw / 2, y1, bw, Math.max(1, y2 - y1));
-  });
-  // уровни
-  const line = (v, col, label, dash) => {
-    if (v == null || isNaN(v)) return;
-    const y = Y(v);
-    g.strokeStyle = col; g.lineWidth = 1.4; g.setLineDash(dash || []);
-    g.beginPath(); g.moveTo(pad.l, y); g.lineTo(w - pad.r, y); g.stroke(); g.setLineDash([]);
-    g.fillStyle = col; g.font = '10.5px sans-serif'; g.textAlign = 'right';
-    g.fillText(label, w - pad.r - 4, y - 3);
-  };
-  line(ov.sl, '#e05260', 'SL ' + nf(ov.sl, dec), [5, 4]);
-  ov.tps.forEach((t, i) => line(t.price, t.hit ? '#2ea86b' : '#3f6f57', 'TP' + (i + 1) + ' ' + nf(t.price, dec) + (t.hit ? ' ✓' : ''), t.hit ? [] : [5, 4]));
-  line(ov.entry, '#8b98a8', 'Вход ' + nf(ov.entry, dec), []);
-  if (ov.exit != null && ov.reason) line(ov.exit, ov.reason === 'tp' ? '#2ea86b' : ov.reason === 'sl' || ov.reason === 'stopout' ? '#e05260' : '#e0a852', 'Выход ' + nf(ov.exit, dec) + ' · ' + ({ sl: 'SL', tp: 'TP', manual: 'вручную', stopout: 'стоп-аут' }[ov.reason] || ''), [2, 3]);
-  // маркеры входа и выхода
-  const mark = (idx, price, isEntry) => {
-    if (idx < 0 || price == null || isNaN(price)) return;
-    const x = X(idx), y = Y(price);
-    g.beginPath();
-    const s = 6, up = isEntry ? (ov.side === 'buy') : (ov.side !== 'buy');
-    g.moveTo(x, y + (up ? -s : s)); g.lineTo(x - s, y + (up ? s : -s) * .6); g.lineTo(x + s, y + (up ? s : -s) * .6);
-    g.closePath();
-    g.fillStyle = isEntry ? '#e6edf3' : (ov.exit >= ov.entry) === (ov.side === 'buy') ? '#2ea86b' : '#e05260';
-    g.fill();
-  };
-  mark(i1, ov.entry, true);
-  mark(i2 >= 0 ? i2 : d.length - 1, ov.exit, false);
-  // время
-  g.fillStyle = '#5c6a7a'; g.font = '10.5px sans-serif';
-  const lbl = t => { const x = new Date(t + tz); return P2(x.getUTCDate()) + '.' + P2(x.getUTCMonth() + 1) + ' ' + P2(x.getUTCHours()) + ':' + P2(x.getUTCMinutes()); };
-  const n = Math.max(2, Math.min(5, Math.floor((w - pad.l - pad.r) / 110)));
-  for (let i = 0; i < n; i++) {
-    const idx = Math.round((d.length - 1) * i / (n - 1));
-    g.textAlign = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
-    g.fillText(lbl(d[idx].t), Math.max(pad.l, Math.min(w - pad.r, X(idx))), h - 6);
   }
+  // уровни текущей сделки: SL и TP пунктиром до шкалы
+  const tag = (v, col, txt) => {
+    const y = Y(v); if (y < pad.t || y > Hh) return;
+    g.fillStyle = col; g.fillRect(W + 1, y - 8, pad.r - 2, 16);
+    g.fillStyle = '#fff'; g.textAlign = 'left'; g.font = 'bold 10.5px Arial, sans-serif'; g.fillText(txt, W + 5, y + 4);
+  };
+  const hl = (v, col, label) => {
+    if (v == null || isNaN(v)) return;
+    const y = Math.round(Y(v)) + 0.5; if (y < pad.t || y > Hh) return;
+    g.strokeStyle = col; g.setLineDash([6, 4]); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.setLineDash([]);
+    g.font = '10.5px Arial, sans-serif'; g.textAlign = 'right'; g.fillStyle = col; g.fillText(label, W - 6, y - 4);
+  };
+  hl(ov.sl, '#e05260', 'SL');
+  ov.tps.forEach((t, i) => hl(t.price, '#2ea86b', 'TP' + (ov.tps.length > 1 ? i + 1 : '')));
+  // сделки: линия вход → выход, треугольники, у текущей — подписи как в cTrader
+  const tri = (x, y, up, col) => {
+    g.fillStyle = col; g.beginPath();
+    if (up) { g.moveTo(x, y - 1); g.lineTo(x - 5, y + 8); g.lineTo(x + 5, y + 8); }
+    else { g.moveTo(x, y + 1); g.lineTo(x - 5, y - 8); g.lineTo(x + 5, y - 8); }
+    g.closePath(); g.fill();
+  };
+  const box = (x, y, parts, col, alignRight) => {
+    g.font = '11px Arial, sans-serif';
+    const ws = parts.map(p => g.measureText(p).width + 8), tw = ws.reduce((a, b) => a + b, 0);
+    let bx = alignRight ? x - tw : x; const by = y - 8;
+    bx = Math.max(2, Math.min(W - tw - 2, bx));
+    g.fillStyle = 'rgba(0,0,0,.85)'; g.fillRect(bx, by, tw, 16);
+    g.strokeStyle = col; g.lineWidth = 1; g.strokeRect(bx + 0.5, by + 0.5, tw - 1, 15);
+    let cx = bx; g.textAlign = 'left'; g.fillStyle = col;
+    parts.forEach((p, i) => { g.fillText(p, cx + 4, by + 12); cx += ws[i]; if (i < parts.length - 1) { g.beginPath(); g.moveTo(cx + 0.5, by + 2); g.lineTo(cx + 0.5, by + 14); g.stroke(); } });
+  };
+  const drawTrade = t => {
+    if (t.entry == null || t.exit == null || isNaN(t.entry) || isNaN(t.exit) || !t.tO) return;
+    const i1 = cdIdx(t.tO), i2 = cdIdx(t.tC || t.tO);
+    if (i2 < iA - 1 || i1 > iB + 1) return;
+    const x1 = X(i1), y1 = Y(t.entry), x2 = X(i2), y2 = Y(t.exit);
+    const win = (t.net != null && !isNaN(t.net)) ? t.net >= 0 : ((t.exit - t.entry) * (t.side === 'buy' ? 1 : -1) >= 0);
+    const buy = t.side === 'buy', colIn = buy ? CD_UP : CD_DN, colOut = buy ? CD_DN : CD_UP;
+    if (t.cur) { g.strokeStyle = 'rgba(150,150,150,.38)'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.lineCap = 'butt'; }
+    g.strokeStyle = win ? CD_UP : CD_DN; g.lineWidth = t.cur ? 1.6 : 1; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    tri(x1, y1, buy, colIn);
+    tri(x2, y2, !buy, colOut);
+    if (t.cur) {
+      const vol = t.vol != null && t.vol !== '' ? String(+t.vol) + ' Lots' : null;
+      box(x1 - 10, y1, [buy ? 'Buy' : 'Sell'].concat(vol ? [vol] : [], [t.entry.toFixed(dec)]), colIn, true);
+      const parts = [buy ? 'Sell' : 'Buy'].concat(vol ? [vol] : [], [t.exit.toFixed(dec)]);
+      if (t.net != null && !isNaN(t.net)) parts.push('Net ' + (S.currency || 'USD') + ' ' + nf(t.net));
+      if (t.pips != null && !isNaN(t.pips)) parts.push('Pips ' + nf(t.pips, 1));
+      if (t.reason === 'sl' || t.reason === 'tp' || t.reason === 'stopout') parts.push(t.reason === 'tp' ? 'TP' : t.reason === 'sl' ? 'SL' : 'Stop out');
+      box(x2 + 10, y2, parts, colOut, false);
+    }
+  };
+  (ov.trades || []).forEach(drawTrade);
+  drawTrade(cur);
+  g.restore();
+  [ov.sl].concat(ov.tps.map(t => t.price)).forEach((v, i) => { if (v != null && !isNaN(v)) tag(v, i ? '#2ea86b' : '#e05260', v.toFixed(dec)); });
+  // оси
+  g.strokeStyle = '#30363d'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(W + 0.5, 0); g.lineTo(W + 0.5, Hh); g.lineTo(0, Hh + 0.5); g.stroke();
+  const d0 = new Date(vis[0].t + tz), off = Math.round(tz / 36e5 * 10) / 10;
+  g.fillStyle = 'rgba(0,0,0,.8)'; g.fillRect(0, Hh + 1, 150, pad.b - 1);
+  g.fillStyle = '#c9d1d9'; g.textAlign = 'left'; g.font = '11px Arial, sans-serif';
+  g.fillText(d0.getUTCDate() + ' ' + MON_SHORT[d0.getUTCMonth()] + ' ' + d0.getUTCFullYear() + ', UTC' + (off >= 0 ? '+' : '') + off, 6, h - 7);
+  // перекрестие и OHLC свечи под курсором
+  if (cdHover && cdHover.x < W && cdHover.y < Hh) {
+    const i = Math.max(iA, Math.min(iB, Math.round(cdView.a + cdHover.x / W * span))), c = d[i];
+    const x = Math.round(X(i)) + 0.5, y = Math.round(cdHover.y) + 0.5, price = lo + (1 - (cdHover.y - pad.t) / (Hh - pad.t)) * (hi - lo);
+    g.strokeStyle = '#8b949e'; g.setLineDash([4, 4]); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, pad.t); g.lineTo(x, Hh); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.setLineDash([]);
+    tag(price, '#3d444d', price.toFixed(dec));
+    const tt = new Date(c.t + tz), tTxt = P2(tt.getUTCDate()) + '.' + P2(tt.getUTCMonth() + 1) + ' ' + P2(tt.getUTCHours()) + ':' + P2(tt.getUTCMinutes());
+    g.font = '11px Arial, sans-serif'; const tw = g.measureText(tTxt).width + 12;
+    g.fillStyle = '#3d444d'; g.fillRect(Math.max(0, Math.min(W - tw, x - tw / 2)), Hh + 2, tw, 18);
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(tTxt, Math.max(tw / 2, Math.min(W - tw / 2, x)), h - 7);
+    const col = c.c >= c.o ? CD_UP : CD_DN;
+    g.textAlign = 'left'; g.font = '11px Arial, sans-serif'; g.fillStyle = col;
+    g.fillText('O ' + c.o.toFixed(dec) + '   H ' + c.h.toFixed(dec) + '   L ' + c.l.toFixed(dec) + '   C ' + c.c.toFixed(dec), 8, pad.t + 12);
+  }
+  cdBind();
+}
+function cdBind() {
+  if (cdBound) return; cdBound = true;
+  const cv = $('#cCandles');
+  const pos = e => { const r = cv.getBoundingClientRect(), p = e.touches ? e.touches[0] : e; return { x: p.clientX - r.left, y: p.clientY - r.top, W: r.width - 66 }; };
+  cv.style.cursor = 'crosshair';
+  cv.addEventListener('wheel', e => {
+    if (!cdData || !cdView) return;
+    e.preventDefault();
+    const p = pos(e), span = cdView.b - cdView.a, m = cdView.a + Math.max(0, Math.min(1, p.x / p.W)) * span;
+    const f = e.deltaY > 0 ? 1.15 : 1 / 1.15, ns = Math.max(12, Math.min(cdData.length * 1.4, span * f));
+    cdView = { a: m - (m - cdView.a) * ns / span, b: m + (cdView.b - m) * ns / span };
+    drawCandles();
+  }, { passive: false });
+  const start = e => { if (!cdView) return; const p = pos(e); cdDrag = { x: p.x, a: cdView.a, b: cdView.b, W: p.W }; cv.style.cursor = 'grabbing'; };
+  const move = e => {
+    if (!cdData) return;
+    const p = pos(e);
+    if (cdDrag) {
+      if (e.touches) e.preventDefault();
+      const sh = (p.x - cdDrag.x) / cdDrag.W * (cdDrag.b - cdDrag.a);
+      cdView = { a: cdDrag.a - sh, b: cdDrag.b - sh }; cdHover = e.touches ? null : p;
+    } else cdHover = p;
+    drawCandles();
+  };
+  const end = () => { cdDrag = null; cv.style.cursor = 'crosshair'; };
+  cv.addEventListener('mousedown', start); cv.addEventListener('touchstart', start, { passive: true });
+  window.addEventListener('mousemove', e => { if (cdDrag || e.target === cv) move(e); });
+  cv.addEventListener('touchmove', move, { passive: false });
+  window.addEventListener('mouseup', end); cv.addEventListener('touchend', end);
+  cv.addEventListener('mouseleave', () => { cdHover = null; if (!cdDrag) drawCandles(); });
+  cv.addEventListener('dblclick', () => { cdView = null; drawCandles(); });
 }
 
 /* =================== ЖУРНАЛ ТРЕЙДЕРА (Матрёшка) =================== */
@@ -4902,8 +5014,9 @@ async function loadCandlesCT(ctid) {
     if (!data.length) { st.innerHTML = '<span class="dn">cTrader не вернул свечей за этот период</span>'; return; }
     cdData = data;
     const num = id => { const v = $('#f_' + id).value; return v === '' ? null : +v; };
-    cdOverlay = { entry: num('openPrice'), exit: num('closePrice'), sl: num('sl'), tps: draftTps.filter(x => x.price != null), side: $('#f_side').value,
+    cdOverlay = { entry: num('openPrice'), exit: num('closePrice'), sl: num('sl'), tps: draftTps.filter(x => x.price != null), side: $('#f_side').value, vol: num('volume'), net: num('net'), pips: num('pips') != null ? num('pips') : calcPips({ symbol: sym, side: $('#f_side').value, openPrice: num('openPrice'), closePrice: num('closePrice') }), trades: cdTradesFor(sym, ctUnwall),
       tOpen, tClose, sym, tzms: new Date(ctWall(tClose)).getTime() - tClose, reason: tr && tr.closeReason };
+    cdView = null;
     st.innerHTML = '<span class="up">cTrader · ' + data.length + ' свечей · ' + iv.toUpperCase() + '</span>' + (tr && tr.closeReason ? ' · закрыта: <b>' + CT_REASON[tr.closeReason] + '</b>' : '');
     drawCandles();
   } catch (e) {
