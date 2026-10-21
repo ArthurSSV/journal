@@ -1786,8 +1786,10 @@ function renderTrades() {
       '<td class="num">' + (t.volume != null ? nf(t.volume) : '—') + '</td>' +
       '<td class="num">' + (t.openPrice != null ? nf(t.openPrice, d) : '—') + '</td>' +
       '<td class="num">' + (CT_TAG[t.closeReason] ? '<span class="xr ' + CT_TAG[t.closeReason][0] + '" title="Закрыта ' + CT_REASON[t.closeReason] + '">' + CT_TAG[t.closeReason][1] + '</span>' : '') + (t.closePrice != null ? nf(t.closePrice, d) : '—') + '</td>' +
+      /* сделка в плюсе — стоп не показываем: она закрыта в прибыль, SL тут не при чём */
+      (+t.net > 0 ? '<td class="num mut">—</td>' :
       '<td class="num mut"' + (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? ' title="Начальный стоп ' + nf(t.slInit, d) + ', потом перенесён"' : '') + '>' + (t.sl != null ? nf(t.sl, d) : '—') +
-        (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? '<div style="font-size:10px;opacity:.6">было ' + nf(t.slInit, d) + '</div>' : '') + '</td>' +
+        (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? '<div style="font-size:10px;opacity:.6">было ' + nf(t.slInit, d) + '</div>' : '') + '</td>') +
       '<td class="num mut">' + (tps.length ? tps.map(x => nf(x.price, d) + (x.hit ? ' ✓' : '')).join(' / ') : (t.tp != null ? nf(t.tp, d) : '—')) + '</td>' +
       '<td class="num ' + cls(p) + '">' + (p === null ? '—' : nf(p, 1)) + '</td>' +
       '<td class="num ' + cls(r) + '">' + (r === null ? '—' : nf(r) + 'R') + '</td>' +
