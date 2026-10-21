@@ -1010,6 +1010,7 @@ canvas{cursor:crosshair}
                 <button class="btn sm" onclick="ctAuthorize()">Подключить cTrader</button>
                 <button class="btn sm" onclick="ctLoadAccounts()">Загрузить счета</button>
                 <button class="btn sm pri ctSyncBtn" onclick="ctSync()">⟳ Синхронизировать</button>
+                <button class="btn sm ctSyncBtn" onclick="ctRecheck()" title="Заново прочитать стопы, тейки и причину закрытия у всех сделок">Перепроверить SL/TP</button>
               </div>
               <div id="ctAccs"></div>
             </div>
@@ -4894,6 +4895,7 @@ async function ctSync(quiet) {
   if (!links.length) { if (!quiet) ctStatus('<span class="warn">Нет привязанных счетов.</span> Нажми «Загрузить счета» и выбери, в какой счёт дневника класть сделки.'); return; }
   if (!gdReady()) { if (!quiet) ctStatus('<span class="dn">Нужен подключённый Google Диск (мост)</span>'); return; }
   ctBusy = true; $$('.ctSyncBtn').forEach(b => b.disabled = true);
+  CT_EMPTY = 0; CT_ERR = '';
   const rep = h => ctStatus('<span class="mut">' + h + '</span>');
   rep('Подключаюсь к cTrader…');
   const res = []; let c = null, cLive = null;
@@ -4907,7 +4909,7 @@ async function ctSync(quiet) {
     const added = res.reduce((s, r) => s + r.added, 0);
     renderAll();
     const enr = res.reduce((s, r) => s + (r.enriched || 0), 0);
-    const msg = (enr ? 'Стопы и тейки уточнены у ' + enr + ' сделок. ' : '') + (added ? 'Из cTrader добавлено сделок: ' + added + ' (' + res.filter(r => r.added).map(r => r.acc.name + ' +' + r.added).join(', ') + ')' : 'Новых сделок в cTrader нет — всё уже в дневнике');
+    const msg = (enr ? 'Стопы и тейки уточнены у ' + enr + ' сделок. ' : '') + (CT_EMPTY ? 'У ' + CT_EMPTY + ' позиций cTrader не вернул ордера. ' : '') + (CT_ERR ? 'Ошибка при чтении ордеров: ' + CT_ERR + '. ' : '') + (added ? 'Из cTrader добавлено сделок: ' + added + ' (' + res.filter(r => r.added).map(r => r.acc.name + ' +' + r.added).join(', ') + ')' : 'Новых сделок в cTrader нет — всё уже в дневнике');
     ctStatus('<span class="up">' + esc(msg) + '</span><br><span class="mut">Синхронизировано ' + dt(ctWall(Date.now())) +
       res.filter(r => r.balance != null).map(r => ' · баланс «' + esc(r.acc.name) + '» в cTrader: ' + nf(r.balance)).join('') + '</span>');
     if (!quiet || added) toast(msg);
@@ -4928,17 +4930,26 @@ function ctUnwall(iso) {                     // «настенное» врем�
   return w - (+CT.tz) * 36e5;
 }
 const ctIsType = (v, n, name) => v === n || v === name;
+let CT_EMPTY = 0, CT_ERR = '';
 async function ctEnrich(c, ctid, accId, report) {
   const all = ctExisting(accId);
-  const todo = all.filter(t => t.src === 'ctrader' && !t.slChk && t.posId).slice(-300);
+  // все сделки счёта с ID позиции — и загруженные из cTrader, и импортированные из CSV
+  const todo = all.filter(t => /^\d+$/.test(String(t.posId || '').trim()) && (+t.slChk || 0) < 2).slice(-400);
   if (!todo.length) return 0;
   let n = 0;
   for (const t of todo) {
     if (report) report('стопы и тейки: позиция ' + esc(t.posId) + ' (' + (n + 1) + ' из ' + todo.length + ')');
     try {
       const o1 = ctUnwall(t.openTime || t.closeTime), c1 = ctUnwall(t.closeTime || t.openTime);
-      const r = await c.send(CT_PT.ORDERS_BY_POS, { ctidTraderAccountId: +ctid, positionId: +t.posId, fromTimestamp: Math.max(0, o1 - 2 * 864e5), toTimestamp: c1 + 2 * 864e5 });
-      await ctSleep(220);
+      const q = { ctidTraderAccountId: +ctid, positionId: +String(t.posId).trim(), fromTimestamp: Math.max(0, o1 - 3 * 864e5), toTimestamp: c1 + 3 * 864e5 };
+      let r;
+      try { r = await c.send(CT_PT.ORDERS_BY_POS, q); }
+      catch (e) {                                   // упёрлись в лимит запросов — ждём и повторяем
+        if (!/BLOCKED|LIMIT|FREQUENCY/i.test(String(e.code || e.message))) throw e;
+        await ctSleep(2500); r = await c.send(CT_PT.ORDERS_BY_POS, q);
+      }
+      await ctSleep(260);
+      if (!(r.order || []).length) { CT_EMPTY++; t.slChk = 2; continue; }
       const ords = (r.order || []).slice().sort((a, b) => +(b.utcLastUpdateTimestamp || 0) - +(a.utcLastUpdateTimestamp || 0));
       let sl = null, tp = null;
       ords.forEach(o => { if (sl == null && o.stopLoss != null) sl = +o.stopLoss; if (tp == null && o.takeProfit != null) tp = +o.takeProfit; });
@@ -4951,16 +4962,19 @@ async function ctEnrich(c, ctid, accId, report) {
       const near = (lvl) => lvl != null && cp != null ? Math.abs(cp - lvl) : Infinity;
       let why = 'manual';
       if (closer && closer.isStopOut) why = 'stopout';
-      else if (closer && ctIsType(closer.orderType, 4, 'STOP_LOSS_TAKE_PROFIT')) why = near(sl) <= near(tp) ? (sl != null ? 'sl' : (+t.net >= 0 ? 'tp' : 'sl')) : 'tp';
+      else if (closer && ctIsType(closer.orderType, 4, 'STOP_LOSS_TAKE_PROFIT')) {
+        if (sl == null && tp == null) { why = +t.net >= 0 ? 'tp' : 'sl'; if (why === 'sl') sl = cp; else tp = cp; }   // уровень не сохранился — берём цену срабатывания
+        else why = near(sl) <= near(tp) ? 'sl' : 'tp';
+      }
       else if (!closer && cp != null) {
         const tol = Math.max(cp * 0.0002, 0.0001);
         if (near(sl) <= tol) why = 'sl'; else if (near(tp) <= tol) why = 'tp';
       }
       const dg = v => v == null ? null : Math.round(v * 1e5) / 1e5;
-      t.sl = dg(sl); t.tp = dg(tp); t.closeReason = why; t.slChk = true;
+      if (sl != null) t.sl = dg(sl); if (tp != null) t.tp = dg(tp); t.closeReason = why; t.slChk = 2;
       if (why === 'tp' && tp != null && !(t.tps && t.tps.length)) t.tps = [{ price: dg(tp), pct: 100, hit: true }];
       n++;
-    } catch (e) { if (/BLOCKED|LIMIT/i.test(String(e.code || e.message))) await ctSleep(1500); }
+    } catch (e) { CT_ERR = String(e.code || e.message || e); }
   }
   if (accId === S.id) { TR = all; save(); } else { localStorage.setItem(TKEY(accId), JSON.stringify(all)); markDirty(); }
   return n;
@@ -5041,6 +5055,13 @@ function fillCT() {
   const linked = Object.keys(CT.links).filter(k => accById(CT.links[k])).length;
   $$('.ctSyncBtn').forEach(b => b.style.display = linked ? '' : 'none');
   const im = $('#ctImpCard'); if (im) im.style.display = '';
+}
+function ctRecheck() {
+  Object.values(CT.links || {}).forEach(id => {
+    const arr = ctExisting(id); arr.forEach(t => { t.slChk = 0; });
+    if (id === S.id) { TR = arr; save(); } else localStorage.setItem(TKEY(id), JSON.stringify(arr));
+  });
+  ctSync();
 }
 function ctReadOpts() {
   CT.tz = $('#ctTz').value === 'auto' ? 'auto' : +$('#ctTz').value;
