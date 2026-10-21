@@ -413,6 +413,13 @@ canvas{cursor:crosshair}
 .jtacc{font-size:9.5px;color:var(--acc2);white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis}
 .ctacc{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
 .ctacc select{width:auto;max-width:200px}
+.xr{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:4px;margin-right:6px;vertical-align:1px}
+.xr.sl{background:var(--dn-bg);color:var(--dn)}
+.xr.tp{background:var(--up-bg);color:var(--up)}
+.tfbtns{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tfbtns button{padding:5px 9px;font-size:12px;color:var(--tx2);border-right:1px solid var(--line)}
+.tfbtns button:last-child{border-right:none}
+.tfbtns button.on{background:var(--acc);color:#fff}
 /* ---------- планшеты и узкие окна ---------- */
 @media(max-width:1100px){
   .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -1078,12 +1085,14 @@ canvas{cursor:crosshair}
         <div class="row" style="gap:6px;margin-bottom:8px">
           <button class="btn sm pri" id="tabSchema" onclick="tradeView('schema')">Схема уровней</button>
           <button class="btn sm" id="tabCandles" onclick="tradeView('candles')">Реальные свечи</button>
-          <select id="cdInt" style="width:110px"><option value="auto">Авто ТФ</option><option value="1m">M1</option><option value="5m">M5</option><option value="15m">M15</option><option value="1h">H1</option><option value="4h">H4</option></select>
+          <div class="tfbtns" id="cdTfs"><button data-v="auto" class="on">Авто</button><button data-v="1m">M1</button><button data-v="5m">M5</button><button data-v="15m">M15</button><button data-v="30m">M30</button><button data-v="1h">H1</button><button data-v="4h">H4</button><button data-v="1d">D1</button></div>
+          <input type="hidden" id="cdInt" value="auto">
+          <select id="cdSrc" style="width:auto" title="Откуда брать свечи"><option value="ct">cTrader</option><option value="quotes">Котировки</option></select>
           <span class="mut" id="cdStatus" style="font-size:11.5px"></span>
         </div>
         <div class="chartbox" style="padding:10px">
           <canvas id="cTrade" height="210"></canvas>
-          <canvas id="cCandles" height="260" style="display:none"></canvas>
+          <canvas id="cCandles" height="380" style="display:none"></canvas>
         </div>
         <div class="row" style="margin-top:8px"><button class="btn sm" onclick="openTV()">Открыть график на TradingView</button></div>
       </div>
@@ -1774,7 +1783,7 @@ function renderTrades() {
       '<td><span class="pill ' + (t.side === 'buy' ? 'b' : 's') + '">' + (t.side === 'buy' ? 'BUY' : 'SELL') + '</span></td>' +
       '<td class="num">' + (t.volume != null ? nf(t.volume) : '—') + '</td>' +
       '<td class="num">' + (t.openPrice != null ? nf(t.openPrice, d) : '—') + '</td>' +
-      '<td class="num">' + (t.closePrice != null ? nf(t.closePrice, d) : '—') + '</td>' +
+      '<td class="num">' + (t.closeReason === 'sl' ? '<span class="xr sl">SL</span>' : t.closeReason === 'tp' ? '<span class="xr tp">TP</span>' : t.closeReason === 'stopout' ? '<span class="xr sl">SO</span>' : '') + (t.closePrice != null ? nf(t.closePrice, d) : '—') + '</td>' +
       '<td class="num mut">' + (t.sl != null ? nf(t.sl, d) : '—') + '</td>' +
       '<td class="num mut">' + (tps.length ? tps.map(x => nf(x.price, d) + (x.hit ? ' ✓' : '')).join(' / ') : (t.tp != null ? nf(t.tp, d) : '—')) + '</td>' +
       '<td class="num ' + cls(p) + '">' + (p === null ? '—' : nf(p, 1)) + '</td>' +
@@ -2463,7 +2472,8 @@ async function openTrade(id) {
   await drawShots();
   $('#mask').classList.add('on');
   cdData = null;
-  setTimeout(() => tradeView('schema'), 30);
+  $('#cdSrc').style.display = ctCtidFor(S.id) ? '' : 'none';
+  setTimeout(() => tradeView(ctCtidFor(S.id) && gdReady() && t ? 'candles' : 'schema'), 30);
 }
 
 /* --- take profit levels --- */
@@ -2589,6 +2599,7 @@ function saveTrade() {
     rating: g('rating'), mistakes: draftMist.slice(), tags: draftTags.slice(), shots: draftShots.slice(),
     created: old.created || Date.now()
   };
+  ['src', 'dealId', 'orderId', 'symbolId', 'ctid', 'closeReason', 'slChk', 'impKey', 'tp'].forEach(k => { if (old[k] !== undefined && rec[k] === undefined) rec[k] = old[k]; });
   if (rec.pips == null) rec.pips = calcPips(rec);
   if (rec.setup && !S.setups.includes(rec.setup)) { S.setups.push(rec.setup); saveS(); }
   if (editId) TR = TR.map(t => t.id === editId ? rec : t); else TR.push(rec);
@@ -2783,6 +2794,8 @@ function pickInterval(spanMs) {
 }
 async function loadCandles() {
   const st = $('#cdStatus');
+  const ctid = typeof ctCtidFor === 'function' ? ctCtidFor(S.id) : null;
+  if (ctid && gdReady() && $('#cdSrc').value !== 'quotes') return loadCandlesCT(ctid);
   if (QS.src === 'off') { st.innerHTML = '<span class="dn">Котировки выключены — включи в Настройках</span>'; return; }
   const sym = $('#f_symbol').value.trim();
   const o = fromInput($('#f_openTime').value), c = fromInput($('#f_closeTime').value);
@@ -2805,8 +2818,8 @@ async function loadCandles() {
 }
 function drawCandles() {
   if (!cdData || !cdData.length) return;
-  const { g, w, h } = ctx('#cCandles', 260);
-  const d = cdData, ov = cdOverlay, tz = QS.tz * 36e5, dec = px(ov.sym);
+  const { g, w, h } = ctx('#cCandles', 380);
+  const d = cdData, ov = cdOverlay, tz = ov.tzms != null ? ov.tzms : QS.tz * 36e5, dec = px(ov.sym);
   const extra = [ov.entry, ov.exit, ov.sl].concat(ov.tps.map(t => t.price)).filter(v => v != null && !isNaN(v));
   const mn = Math.min(...d.map(x => x.l), ...extra), mx = Math.max(...d.map(x => x.h), ...extra);
   const sp = (mx - mn) || 1, lo = mn - sp * .06, hi = mx + sp * .06;
@@ -2848,6 +2861,7 @@ function drawCandles() {
   line(ov.sl, '#e05260', 'SL ' + nf(ov.sl, dec), [5, 4]);
   ov.tps.forEach((t, i) => line(t.price, t.hit ? '#2ea86b' : '#3f6f57', 'TP' + (i + 1) + ' ' + nf(t.price, dec) + (t.hit ? ' ✓' : ''), t.hit ? [] : [5, 4]));
   line(ov.entry, '#8b98a8', 'Вход ' + nf(ov.entry, dec), []);
+  if (ov.exit != null && ov.reason) line(ov.exit, ov.reason === 'tp' ? '#2ea86b' : ov.reason === 'sl' || ov.reason === 'stopout' ? '#e05260' : '#e0a852', 'Выход ' + nf(ov.exit, dec) + ' · ' + ({ sl: 'SL', tp: 'TP', manual: 'вручную', stopout: 'стоп-аут' }[ov.reason] || ''), [2, 3]);
   // маркеры входа и выхода
   const mark = (idx, price, isEntry) => {
     if (idx < 0 || price == null || isNaN(price)) return;
@@ -4559,7 +4573,8 @@ try { Object.assign(CT, JSON.parse(localStorage.getItem(LS_CT)) || {}); } catch 
 function saveCT() { localStorage.setItem(LS_CT, JSON.stringify(CT)); }
 let ctBusy = false;
 const CT_PT = { APP_AUTH: 2100, APP_AUTH_RES: 2101, ACC_AUTH: 2102, ACC_AUTH_RES: 2103, SYMBOLS: 2114, SYMBOLS_RES: 2115, SYMBOL_BY_ID: 2116,
-  TRADER: 2121, DEALS: 2133, ERROR: 2142, ACCOUNTS_BY_TOKEN: 2149, DEALS_BY_POS: 2179, HEARTBEAT: 51, COMMON_ERROR: 50, TOKEN_INVALID: 2147 };
+  TRADER: 2121, DEALS: 2133, ERROR: 2142, ACCOUNTS_BY_TOKEN: 2149, DEALS_BY_POS: 2179, HEARTBEAT: 51, COMMON_ERROR: 50, TOKEN_INVALID: 2147,
+  TRENDBARS: 2137, ORDERS_BY_POS: 2183 };
 function ctStatus(html) { const n = $('#ctStatus'); if (n) n.innerHTML = html; const m = $('#ctImpStatus'); if (m) m.innerHTML = html; }
 
 /* --- соединение --- */
@@ -4578,7 +4593,8 @@ function ctOpen(live) {
           ws.send(JSON.stringify({ clientMsgId: id, payloadType: pt, payload: payload || {} }));
         });
       },
-      close() { closed = true; clearInterval(hb); try { ws.close(); } catch (e) {} }
+      close() { closed = true; clearInterval(hb); try { ws.close(); } catch (e) {} },
+      alive() { return !closed; }
     };
     const to = setTimeout(() => { reject(new Error('не удалось подключиться к cTrader')); api.close(); }, 15000);
     ws.onopen = () => { clearTimeout(to); hb = setInterval(() => { try { ws.send(JSON.stringify({ payloadType: CT_PT.HEARTBEAT, payload: {} })); } catch (e) {} }, 10000); resolve(api); };
@@ -4733,7 +4749,8 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
     const ls = lot[+d.symbolId];
     const gross = ctNum(cp.grossProfit, md), sw = ctNum(cp.swap, md), com = ctNum(cp.commission, md), fee = ctNum(cp.pnlConversionFee, md) || 0;
     const rec = {
-      id: uid(), posId: String(d.positionId), dealId: String(d.dealId), src: 'ctrader',
+      id: uid(), posId: String(d.positionId), dealId: String(d.dealId), orderId: d.orderId != null ? String(d.orderId) : null,
+      symbolId: d.symbolId != null ? +d.symbolId : null, ctid: String(ctid), src: 'ctrader',
       symbol: String(syms[d.symbolId] || ('#' + d.symbolId)).replace(/[\/\s]/g, '').toUpperCase(),
       side: o ? (ctIsSell(o.tradeSide) ? 'sell' : 'buy') : (ctIsSell(d.tradeSide) ? 'buy' : 'sell'),
       volume: ls ? Math.round(vol / ls * 100) / 100 : Math.round(vol / 100) / 100,
@@ -4755,8 +4772,9 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
     if (accId === S.id) { TR = TR.concat(fresh); save(); }
     else { localStorage.setItem(TKEY(accId), JSON.stringify(existing.concat(fresh))); ACC_IDX = null; markDirty(); }
   }
+  const enr = await ctEnrich(c, ctid, accId, report);
   CT.last[ctid] = Date.now(); saveCT();
-  return { added: fresh.length, seen: rows.length, balance: trader.balance != null ? ctNum(trader.balance, trader.moneyDigits) : null, acc };
+  return { added: fresh.length, enriched: enr, seen: rows.length, balance: trader.balance != null ? ctNum(trader.balance, trader.moneyDigits) : null, acc };
 }
 async function ctSync(quiet) {
   if (ctBusy) return;
@@ -4776,7 +4794,8 @@ async function ctSync(quiet) {
     }
     const added = res.reduce((s, r) => s + r.added, 0);
     renderAll();
-    const msg = added ? 'Из cTrader добавлено сделок: ' + added + ' (' + res.filter(r => r.added).map(r => r.acc.name + ' +' + r.added).join(', ') + ')' : 'Новых сделок в cTrader нет — всё уже в дневнике';
+    const enr = res.reduce((s, r) => s + (r.enriched || 0), 0);
+    const msg = (enr ? 'Стопы и тейки уточнены у ' + enr + ' сделок. ' : '') + (added ? 'Из cTrader добавлено сделок: ' + added + ' (' + res.filter(r => r.added).map(r => r.acc.name + ' +' + r.added).join(', ') + ')' : 'Новых сделок в cTrader нет — всё уже в дневнике');
     ctStatus('<span class="up">' + esc(msg) + '</span><br><span class="mut">Синхронизировано ' + dt(ctWall(Date.now())) +
       res.filter(r => r.balance != null).map(r => ' · баланс «' + esc(r.acc.name) + '» в cTrader: ' + nf(r.balance)).join('') + '</span>');
     if (!quiet || added) toast(msg);
@@ -4788,6 +4807,112 @@ async function ctSync(quiet) {
     if (!quiet) toast('cTrader: ' + m);
   } finally { if (c) c.close(); ctBusy = false; $$('.ctSyncBtn').forEach(b => b.disabled = false); fillCT(); }
 }
+
+/* SL, TP и причина закрытия: история сделок их не содержит — берём из ордеров позиции */
+function ctUnwall(iso) {                     // «настенное» время дневника → настоящее UTC
+  const w = new Date(iso).getTime();
+  if (isNaN(w)) return NaN;
+  if (CT.tz === 'auto' || CT.tz == null || CT.tz === '') return w + new Date(w).getTimezoneOffset() * 60000;
+  return w - (+CT.tz) * 36e5;
+}
+const ctIsType = (v, n, name) => v === n || v === name;
+async function ctEnrich(c, ctid, accId, report) {
+  const all = ctExisting(accId);
+  const todo = all.filter(t => t.src === 'ctrader' && !t.slChk && t.posId).slice(-300);
+  if (!todo.length) return 0;
+  let n = 0;
+  for (const t of todo) {
+    if (report) report('стопы и тейки: позиция ' + esc(t.posId) + ' (' + (n + 1) + ' из ' + todo.length + ')');
+    try {
+      const o1 = ctUnwall(t.openTime || t.closeTime), c1 = ctUnwall(t.closeTime || t.openTime);
+      const r = await c.send(CT_PT.ORDERS_BY_POS, { ctidTraderAccountId: +ctid, positionId: +t.posId, fromTimestamp: Math.max(0, o1 - 2 * 864e5), toTimestamp: c1 + 2 * 864e5 });
+      await ctSleep(220);
+      const ords = (r.order || []).slice().sort((a, b) => +(b.utcLastUpdateTimestamp || 0) - +(a.utcLastUpdateTimestamp || 0));
+      let sl = null, tp = null;
+      ords.forEach(o => { if (sl == null && o.stopLoss != null) sl = +o.stopLoss; if (tp == null && o.takeProfit != null) tp = +o.takeProfit; });
+      const op = t.openPrice != null ? +t.openPrice : null, buy = t.side === 'buy';
+      if (sl == null && op != null) { const m = ords.find(o => o.relativeStopLoss != null); if (m) sl = buy ? op - m.relativeStopLoss / 1e5 : op + m.relativeStopLoss / 1e5; }
+      if (tp == null && op != null) { const m = ords.find(o => o.relativeTakeProfit != null); if (m) tp = buy ? op + m.relativeTakeProfit / 1e5 : op - m.relativeTakeProfit / 1e5; }
+      const cp = t.closePrice != null ? +t.closePrice : null;
+      const closer = (t.orderId && ords.find(o => String(o.orderId) === String(t.orderId))) ||
+        ords.find(o => o.closingOrder || ctIsType(o.orderType, 4, 'STOP_LOSS_TAKE_PROFIT'));
+      const near = (lvl) => lvl != null && cp != null ? Math.abs(cp - lvl) : Infinity;
+      let why = 'manual';
+      if (closer && closer.isStopOut) why = 'stopout';
+      else if (closer && ctIsType(closer.orderType, 4, 'STOP_LOSS_TAKE_PROFIT')) why = near(sl) <= near(tp) ? (sl != null ? 'sl' : (+t.net >= 0 ? 'tp' : 'sl')) : 'tp';
+      else if (!closer && cp != null) {
+        const tol = Math.max(cp * 0.0002, 0.0001);
+        if (near(sl) <= tol) why = 'sl'; else if (near(tp) <= tol) why = 'tp';
+      }
+      const dg = v => v == null ? null : Math.round(v * 1e5) / 1e5;
+      t.sl = dg(sl); t.tp = dg(tp); t.closeReason = why; t.slChk = true;
+      if (why === 'tp' && tp != null && !(t.tps && t.tps.length)) t.tps = [{ price: dg(tp), pct: 100, hit: true }];
+      n++;
+    } catch (e) { if (/BLOCKED|LIMIT/i.test(String(e.code || e.message))) await ctSleep(1500); }
+  }
+  if (accId === S.id) { TR = all; save(); } else { localStorage.setItem(TKEY(accId), JSON.stringify(all)); markDirty(); }
+  return n;
+}
+
+/* ---------- свечи cTrader в карточке сделки ---------- */
+const CT_PERIOD = { '1m': 1, '5m': 5, '15m': 7, '30m': 8, '1h': 9, '4h': 10, '1d': 12 };
+const CT_PMS = { '1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 144e5, '1d': 864e5 };
+let ctChart = null;
+function ctCtidFor(accId) { return Object.keys(CT.links || {}).find(k => CT.links[k] === accId) || null; }
+async function ctChartConn(ctid) {
+  if (ctChart && ctChart.ctid === ctid && ctChart.conn.alive() && Date.now() - ctChart.at < 120000) { ctChart.at = Date.now(); return ctChart; }
+  if (ctChart) { try { ctChart.conn.close(); } catch (e) {} ctChart = null; }
+  const a = CT.accounts.find(x => x.ctid === ctid) || { live: true };
+  const tk = await ctToken();
+  const c = await ctSession(a.live, tk);
+  try { await c.send(CT_PT.ACC_AUTH, { ctidTraderAccountId: +ctid, accessToken: tk.accessToken }); }
+  catch (e) { if (!/ALREADY/i.test(e.code || e.message)) { c.close(); throw e; } }
+  ctChart = { ctid, conn: c, at: Date.now(), syms: null };
+  return ctChart;
+}
+async function ctSymbolId(ch, name) {
+  if (!ch.syms) {
+    const r = await ch.conn.send(CT_PT.SYMBOLS, { ctidTraderAccountId: +ch.ctid, includeArchivedSymbols: false });
+    ch.syms = {}; (r.symbol || []).forEach(x => ch.syms[String(x.symbolName || '').replace(/[\/\s]/g, '').toUpperCase()] = +x.symbolId);
+  }
+  return ch.syms[String(name).replace(/[\/\s]/g, '').toUpperCase()] || null;
+}
+async function loadCandlesCT(ctid) {
+  const st = $('#cdStatus');
+  const tr = editId ? TR.find(x => x.id === editId) : null;
+  const sym = $('#f_symbol').value.trim();
+  const ow = fromInput($('#f_openTime').value), cw = fromInput($('#f_closeTime').value);
+  if (!sym || !cw) { st.innerHTML = '<span class="dn">Нужны символ и время закрытия</span>'; return; }
+  const tOpen = ctUnwall(ow || cw), tClose = ctUnwall(cw);
+  const span = Math.max(tClose - tOpen, 20 * 60000);
+  let iv = pickInterval(span); if (!CT_PERIOD[iv]) iv = '15m';
+  const pms = CT_PMS[iv];
+  let from = tOpen - Math.max(span * 0.8, 70 * pms), to = Math.min(Date.now(), tClose + Math.max(span * 0.8, 50 * pms));
+  if ((to - from) / pms > 700) { const mid = (tOpen + tClose) / 2; from = mid - 350 * pms; to = Math.min(Date.now(), mid + 350 * pms); }
+  st.innerHTML = 'Загружаю свечи cTrader ' + iv.toUpperCase() + '…';
+  try {
+    const ch = await ctChartConn(ctid);
+    const sid = (tr && tr.symbolId) || await ctSymbolId(ch, sym);
+    if (!sid) throw new Error('символ ' + sym + ' не найден на счёте cTrader');
+    const r = await ch.conn.send(CT_PT.TRENDBARS, { ctidTraderAccountId: +ctid, symbolId: +sid, period: CT_PERIOD[iv], fromTimestamp: Math.floor(from), toTimestamp: Math.floor(to) }, 45000);
+    const data = (r.trendbar || []).map(b => {
+      const lo = +b.low / 1e5;
+      return { t: +b.utcTimestampInMinutes * 60000, o: lo + (+b.deltaOpen || 0) / 1e5, h: lo + (+b.deltaHigh || 0) / 1e5, l: lo, c: lo + (+b.deltaClose || 0) / 1e5 };
+    }).sort((a, b) => a.t - b.t);
+    if (!data.length) { st.innerHTML = '<span class="dn">cTrader не вернул свечей за этот период</span>'; return; }
+    cdData = data;
+    const num = id => { const v = $('#f_' + id).value; return v === '' ? null : +v; };
+    cdOverlay = { entry: num('openPrice'), exit: num('closePrice'), sl: num('sl'), tps: draftTps.filter(x => x.price != null), side: $('#f_side').value,
+      tOpen, tClose, sym, tzms: new Date(ctWall(tClose)).getTime() - tClose, reason: tr && tr.closeReason };
+    st.innerHTML = '<span class="up">cTrader · ' + data.length + ' свечей · ' + iv.toUpperCase() + '</span>' + (tr && tr.closeReason ? ' · закрыта: <b>' + CT_REASON[tr.closeReason] + '</b>' : '');
+    drawCandles();
+  } catch (e) {
+    st.innerHTML = '<span class="dn">cTrader: ' + esc(String(e.message || e)).slice(0, 90) + '</span>';
+    if (ctChart) { try { ctChart.conn.close(); } catch (x) {} ctChart = null; }
+  }
+}
+const CT_REASON = { sl: 'по Stop Loss', tp: 'по Take Profit', manual: 'вручную', stopout: 'стоп-аут' };
+
 function fillCT() {
   const box = $('#ctAccs'); if (!box) return;
   if ($('#ctId') && !$('#ctId').value) $('#ctId').value = CT.clientId || '';
@@ -6381,7 +6506,12 @@ $('#restoreF').onchange = e => { if (e.target.files[0]) restore(e.target.files[0
 window.addEventListener('resize', () => { renderDash(); if ($('#p-stats').classList.contains('on')) renderStats(); });
 
 $('#qSrc').onchange = () => { $('#qKeyBox').style.display = $('#qSrc').value === 'twelve' ? '' : 'none'; };
-$('#cdInt').onchange = () => { if ($('#cCandles').style.display !== 'none') loadCandles(); };
+$('#cdTfs').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  $('#cdInt').value = b.dataset.v; $$('#cdTfs button').forEach(x => x.classList.toggle('on', x === b));
+  if ($('#cCandles').style.display === 'none') tradeView('candles'); else loadCandles();
+};
+$('#cdSrc').onchange = () => { if ($('#cCandles').style.display !== 'none') loadCandles(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && QS.src !== 'off') tickLive(); });
 
 load();
