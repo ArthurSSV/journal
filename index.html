@@ -1819,7 +1819,10 @@ function renderTrades() {
       (+t.net > 0 ? '<td class="num mut">—</td>' :
       '<td class="num mut"' + (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? ' title="Начальный стоп ' + nf(t.slInit, d) + ', потом перенесён"' : '') + '>' + (t.sl != null ? nf(t.sl, d) : '—') +
         (t.slInit != null && t.sl != null && Math.abs(t.slInit - t.sl) > 1e-6 ? '<div style="font-size:10px;opacity:.6">было ' + nf(t.slInit, d) + '</div>' : '') + '</td>') +
-      '<td class="num mut">' + (tps.length ? tps.map(x => nf(x.price, d) + (x.hit ? ' ✓' : '')).join(' / ') : (t.tp != null ? nf(t.tp, d) : '—')) + '</td>' +
+      /* сделка в плюсе — в TP цена, по которой реально закрыта эта часть; плановый тейк — в подсказке */
+      (+t.net > 0 && t.closePrice != null
+        ? '<td class="num mut"' + ((tps.length || t.tp != null) ? ' title="Плановый тейк: ' + (tps.length ? tps.map(x => nf(x.price, d)).join(' / ') : nf(t.tp, d)) + '"' : '') + '>' + nf(t.closePrice, d) + '</td>'
+        : '<td class="num mut">' + (tps.length ? tps.map(x => nf(x.price, d) + (x.hit ? ' ✓' : '')).join(' / ') : (t.tp != null ? nf(t.tp, d) : '—')) + '</td>') +
       '<td class="num ' + cls(p) + '">' + (p === null ? '—' : nf(p, 1)) + '</td>' +
       '<td class="num ' + cls(r) + '">' + (r === null ? '—' : nf(r) + 'R') + '</td>' +
       '<td class="num ' + cls(t.net) + '"><b>' + money(t.net) + '</b></td>' +
@@ -3441,7 +3444,7 @@ function ctradeToRow(t) {
     lot: t.volume != null ? +t.volume : null,
     entry: t.openPrice != null ? +t.openPrice : null,
     stop: t.sl != null ? +t.sl : (!win ? cp : null),
-    take: tp != null ? tp : (win ? cp : null),
+    take: win && cp != null ? cp : tp,
     exit: cp,
     money: +t.net,
     form: t.setup || '',
