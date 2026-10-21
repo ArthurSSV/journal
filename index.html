@@ -421,6 +421,11 @@ canvas{cursor:crosshair}
 .tfbtns button{padding:5px 9px;font-size:12px;color:var(--tx2);border-right:1px solid var(--line)}
 .tfbtns button:last-child{border-right:none}
 .tfbtns button.on{background:var(--acc);color:#fff}
+.pwbox{position:relative}
+.pwbox input{padding-right:40px}
+.pwbtn{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:28px;border-radius:6px;font-size:14px;opacity:.55}
+.pwbtn:hover{opacity:1;background:var(--bg3)}
+.pwbtn.on{opacity:1}
 /* ---------- планшеты и узкие окна ---------- */
 @media(max-width:1100px){
   .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -975,8 +980,8 @@ canvas{cursor:crosshair}
             Дневник сохраняет бэкап прямо на твой Диск и забирает его оттуда на любом устройстве.
             Нужна разовая настройка на 5 минут — <a href="#" onclick="openGdHelp();return false">открыть инструкцию</a>.
           </p>
-          <div class="field"><label>Адрес веб-приложения (заканчивается на /exec)</label><input id="gdUrl" placeholder="https://script.google.com/macros/s/.../exec"></div>
-          <div class="field"><label>Секретное слово</label><input id="gdSecret" placeholder="то же, что в скрипте"></div>
+          <div class="field"><label>Адрес веб-приложения (заканчивается на /exec)</label><div class="pwbox"><input id="gdUrl" type="password" autocomplete="new-password" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec"><button type="button" class="pwbtn" data-pw="gdUrl" title="Показать / скрыть">👁</button></div></div>
+          <div class="field"><label>Секретное слово</label><div class="pwbox"><input id="gdSecret" type="password" autocomplete="new-password" spellcheck="false" placeholder="то же, что в скрипте"><button type="button" class="pwbtn" data-pw="gdSecret" title="Показать / скрыть">👁</button></div></div>
           <div class="grid" style="grid-template-columns:2fr 1fr">
             <div class="field"><label>Папка на Диске</label><input id="gdFolder" placeholder="Дневник трейдера"></div>
             <div class="field"><label>Хранить копий</label><input id="gdKeep" type="number" min="1" max="200" step="1"></div>
@@ -999,11 +1004,11 @@ canvas{cursor:crosshair}
           <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
             <div>
               <div class="fgtitle" style="margin-bottom:6px">1. Ключи приложения</div>
-              <div class="field"><label>Client ID</label><input id="ctId" autocomplete="off" placeholder="из Applications → Credentials"></div>
-              <div class="field"><label>Client Secret</label><input id="ctSecret" type="password" autocomplete="new-password" placeholder="хранится только в мосте"></div>
+              <div class="field"><label>Client ID</label><div class="pwbox"><input id="ctId" type="password" autocomplete="new-password" spellcheck="false" placeholder="из Applications → Credentials"><button type="button" class="pwbtn" data-pw="ctId" title="Показать / скрыть">👁</button></div></div>
+              <div class="field"><label>Client Secret</label><div class="pwbox"><input id="ctSecret" type="password" autocomplete="new-password" spellcheck="false" placeholder="хранится только в мосте"><button type="button" class="pwbtn" data-pw="ctSecret" title="Показать / скрыть">👁</button></div></div>
               <div class="row" style="gap:6px"><button class="btn sm pri" onclick="ctSaveKeys()">Сохранить в мост</button></div>
               <div class="mut" style="font-size:11.5px;margin-top:10px;line-height:1.6">В портале cTrader: <b>Applications → Edit → Redirect URIs</b> добавь этот адрес:<br>
-                <code id="ctRedir" style="word-break:break-all;color:var(--tx)"></code> <button class="btn sm" onclick="navigator.clipboard.writeText(SY.gdUrl||'').then(()=>toast('Адрес скопирован'))">Копировать</button></div>
+                <code id="ctRedir" style="word-break:break-all;color:var(--tx)"></code> <button class="btn sm" onclick="ctRedirShow=!ctRedirShow;fillCT()">👁</button> <button class="btn sm" onclick="navigator.clipboard.writeText(SY.gdUrl||'').then(()=>toast('Адрес скопирован'))">Копировать</button></div>
             </div>
             <div>
               <div class="fgtitle" style="margin-bottom:6px">2. Доступ и счета</div>
@@ -4721,7 +4726,7 @@ const LS_CT = 'fxj.ct.v1';
 let CT = { clientId: '', connected: false, expires: 0, accounts: [], links: {}, last: {}, tz: 'auto', auto: true, from: '' };
 try { Object.assign(CT, JSON.parse(localStorage.getItem(LS_CT)) || {}); } catch (e) {}
 function saveCT() { localStorage.setItem(LS_CT, JSON.stringify(CT)); }
-let ctBusy = false;
+let ctBusy = false, ctRedirShow = false;
 const CT_PT = { APP_AUTH: 2100, APP_AUTH_RES: 2101, ACC_AUTH: 2102, ACC_AUTH_RES: 2103, SYMBOLS: 2114, SYMBOLS_RES: 2115, SYMBOL_BY_ID: 2116,
   TRADER: 2121, DEALS: 2133, ERROR: 2142, ACCOUNTS_BY_TOKEN: 2149, DEALS_BY_POS: 2179, HEARTBEAT: 51, COMMON_ERROR: 50, TOKEN_INVALID: 2147,
   TRENDBARS: 2137, ORDERS_BY_POS: 2183 };
@@ -5099,7 +5104,7 @@ const CT_TAG = { sl: ['sl', 'SL'], tp: ['tp', 'TP'], slp: ['tp', 'SL+'], be: ['b
 function fillCT() {
   const box = $('#ctAccs'); if (!box) return;
   if ($('#ctId') && !$('#ctId').value) $('#ctId').value = CT.clientId || '';
-  if ($('#ctRedir')) $('#ctRedir').textContent = SY.gdUrl || '— сначала подключи Google Диск —';
+  if ($('#ctRedir')) $('#ctRedir').textContent = !SY.gdUrl ? '— сначала подключи Google Диск —' : ctRedirShow ? SY.gdUrl : SY.gdUrl.replace(/\/s\/[^/]+\//, '/s/••••••••••••/');
   if ($('#ctTz')) $('#ctTz').value = CT.tz == null ? 'auto' : String(CT.tz);
   if ($('#ctAuto')) $('#ctAuto').checked = CT.auto !== false;
   if ($('#ctFrom')) $('#ctFrom').value = CT.from || dOnly(Date.now() - 90 * 864e5);
@@ -6565,6 +6570,7 @@ function jView(v) {
 }
 function go(p) {
   currentPage = p;
+  $$('.pwbox input').forEach(i => i.type = 'password'); $$('.pwbtn').forEach(b => b.classList.remove('on'));
   const pg = p;
   if (pg === 'kb' && kbArea) { kbArea = ''; kbPath = ''; if ($('#kbSearch')) $('#kbSearch').value = ''; }
   if (p === 'bt') { renderGS(); if (Date.now() - (GS.at || 0) > 20000) gsRefresh(true); }
@@ -6607,6 +6613,13 @@ $('#jMonth').onchange = renderJournal;
 $('#jSub').onclick = e => { const b = e.target.closest('button'); if (b) jView(b.dataset.v); };
 $('#kbSearch').oninput = renderKB;
 $('#kbFile').onchange = e => { kbAdd(e.target.files); e.target.value = ''; };
+/* поля-ключи скрыты как пароль; глаз — показать на время, при уходе со страницы снова скрываются */
+document.addEventListener('click', e => {
+  const b = e.target.closest('.pwbtn'); if (!b) return;
+  const inp = document.getElementById(b.dataset.pw); if (!inp) return;
+  const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.classList.toggle('on', show);
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) { $$('.pwbox input').forEach(i => i.type = 'password'); $$('.pwbtn').forEach(b => b.classList.remove('on')); ctRedirShow = false; } });
 $('#kbRepl').onchange = e => { kbReplace(e.target.files[0]); e.target.value = ''; };
 $('#gsFile').onchange = e => { gsUpload(e.target.files); e.target.value = ''; };
 (() => {
