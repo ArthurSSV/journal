@@ -426,6 +426,11 @@ canvas{cursor:crosshair}
 .pwbtn{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:28px;border-radius:6px;font-size:14px;opacity:.55}
 .pwbtn:hover{opacity:1;background:var(--bg3)}
 .pwbtn.on{opacity:1}
+.hvbox{position:fixed;z-index:140;width:660px;max-width:calc(100vw - 16px);background:#000;border:1px solid #30363d;border-radius:10px;box-shadow:0 14px 44px rgba(0,0,0,.65);padding:10px 12px 8px;pointer-events:none;display:none}
+.hvbox.on{display:block}
+.hvh{font-size:12.5px;margin-bottom:6px;color:#c9d1d9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hvs{font-size:11px;color:#8b949e;margin-top:5px}
+#hvC{width:100%;display:block}
 /* ---------- планшеты и узкие окна ---------- */
 @media(max-width:1100px){
   .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -1812,7 +1817,7 @@ function renderTrades() {
   $('#tbody').innerHTML = page.length ? page.map(t => {
     const r = R(t), p = calcPips(t), d = px(t.symbol);
     const tps = (t.tps || []).filter(x => x.price);
-    return '<tr onclick="openTrade(\'' + t.id + '\')">' +
+    return '<tr data-tid="' + t.id + '" onclick="hvHide();openTrade(\'' + t.id + '\')">' +
       '<td>' + dt(t.closeTime) + '</td>' +
       '<td class="mut">' + dt(t.openTime) + '</td>' +
       '<td><b>' + esc(t.symbol) + '</b></td>' +
@@ -2878,9 +2883,10 @@ function cdIdx(t) {                          // индекс свечи, в ко
   return lo;
 }
 function cdNice(x) { const p = Math.pow(10, Math.floor(Math.log10(x))), f = x / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
-function drawCandles() {
+function drawCandles() { drawCandlesInto('#cCandles', 380, true); }
+function drawCandlesInto(sel, hgt, bind) {
   if (!cdData || !cdData.length) return;
-  const { g, w, h } = ctx('#cCandles', 380);
+  const { g, w, h } = ctx(sel, hgt);
   const d = cdData, ov = cdOverlay, tz = ov.tzms != null ? ov.tzms : QS.tz * 36e5, dec = px(ov.sym), n = d.length;
   if (!cdView) cdView = { a: -0.5, b: n - 0.5 };
   const pad = { r: 66, t: 6, b: 22 }, W = w - pad.r, Hh = h - pad.b;
@@ -3006,7 +3012,7 @@ function drawCandles() {
     g.textAlign = 'left'; g.font = '11px Arial, sans-serif'; g.fillStyle = col;
     g.fillText('O ' + c.o.toFixed(dec) + '   H ' + c.h.toFixed(dec) + '   L ' + c.l.toFixed(dec) + '   C ' + c.c.toFixed(dec), 8, pad.t + 12);
   }
-  cdBind();
+  if (bind) cdBind();
 }
 function cdBind() {
   if (cdBound) return; cdBound = true;
@@ -6613,6 +6619,90 @@ $('#jMonth').onchange = renderJournal;
 $('#jSub').onclick = e => { const b = e.target.closest('button'); if (b) jView(b.dataset.v); };
 $('#kbSearch').oninput = renderKB;
 $('#kbFile').onchange = e => { kbAdd(e.target.files); e.target.value = ''; };
+/* ---------- предпросмотр графика cTrader при наведении на сделку ---------- */
+const HV_CACHE = new Map();
+let hvTimer = null, hvId = null;
+function hvBox() {
+  let b = document.getElementById('hvBox');
+  if (!b) {
+    b = document.createElement('div'); b.id = 'hvBox'; b.className = 'hvbox';
+    b.innerHTML = '<div class="hvh" id="hvH"></div><canvas id="hvC" height="300"></canvas><div class="hvs" id="hvS"></div>';
+    document.body.appendChild(b);
+  }
+  return b;
+}
+function hvPlace(e) {
+  const b = document.getElementById('hvBox'); if (!b || !b.classList.contains('on')) return;
+  const bw = b.offsetWidth || 660, bh = b.offsetHeight || 370;
+  let x = e.clientX + 22, y = e.clientY + 18;
+  if (x + bw > innerWidth - 8) x = e.clientX - bw - 22;
+  if (x < 8) x = 8;
+  if (y + bh > innerHeight - 8) y = innerHeight - bh - 8;
+  if (y < 8) y = 8;
+  b.style.left = x + 'px'; b.style.top = y + 'px';
+}
+function hvHide() { clearTimeout(hvTimer); hvId = null; const b = document.getElementById('hvBox'); if (b) b.classList.remove('on'); }
+async function hvData(t, ctid) {
+  if (HV_CACHE.has(t.id)) return HV_CACHE.get(t.id);
+  const tOpen = ctUnwall(t.openTime || t.closeTime), tClose = ctUnwall(t.closeTime || t.openTime);
+  const span = Math.max(tClose - tOpen, 20 * 60000), hh = span / 36e5;
+  const iv = hh <= 1.5 ? '1m' : hh <= 8 ? '5m' : hh <= 36 ? '15m' : hh <= 240 ? '1h' : '4h', pms = CT_PMS[iv];
+  const from = tOpen - Math.max(span * 0.6, 45 * pms), to = Math.min(Date.now() - 1000, tClose + Math.max(span * 0.6, 35 * pms));
+  const ch = await ctChartConn(ctid);
+  const sid = t.symbolId || await ctSymbolId(ch, t.symbol);
+  if (!sid) throw new Error('символ ' + t.symbol + ' не найден на счёте cTrader');
+  const r = await ch.conn.send(CT_PT.TRENDBARS, { ctidTraderAccountId: +ctid, symbolId: +sid, period: CT_PERIOD[iv], fromTimestamp: Math.floor(from), toTimestamp: Math.floor(to) }, 45000);
+  const data = (r.trendbar || []).map(b => { const lo = +b.low / 1e5; return { t: +b.utcTimestampInMinutes * 60000, o: lo + (+b.deltaOpen || 0) / 1e5, h: lo + (+b.deltaHigh || 0) / 1e5, l: lo, c: lo + (+b.deltaClose || 0) / 1e5 }; }).sort((a, b) => a.t - b.t);
+  const sv = editId; editId = t.id; let others; try { others = cdTradesFor(t.symbol, ctUnwall); } finally { editId = sv; }
+  const tps = (t.tps || []).filter(x => x.price != null);
+  const res = { iv, data, ov: {
+    entry: t.openPrice != null ? +t.openPrice : null, exit: t.closePrice != null ? +t.closePrice : null,
+    sl: t.sl != null && +t.net <= 0 ? +t.sl : null, tps: tps.length ? tps : (t.tp != null ? [{ price: +t.tp }] : []),
+    side: t.side, tOpen, tClose, sym: t.symbol, vol: t.volume, net: +t.net, pips: t.pips != null ? +t.pips : calcPips(t),
+    reason: t.closeReason, tzms: new Date(ctWall(tClose)).getTime() - tClose, trades: others } };
+  HV_CACHE.set(t.id, res);
+  return res;
+}
+function hvDraw(t, res) {
+  const sv = [cdData, cdOverlay, cdView, cdHover, editId];
+  cdData = res.data; cdOverlay = res.ov; cdView = null; cdHover = null; editId = t.id;
+  try { drawCandlesInto('#hvC', 300, false); } finally { [cdData, cdOverlay, cdView, cdHover, editId] = sv; }
+}
+async function hvShow(id, ev) {
+  const t = TR.find(x => x.id === id), ctid = ctCtidFor(S.id);
+  if (!t || !ctid || !gdReady() || hvId !== id) return;
+  const b = hvBox(), g = tradeTag(t);
+  $('#hvH').innerHTML = '<b>' + esc(t.symbol) + '</b> · <span class="' + (t.side === 'buy' ? 'up' : 'dn') + '">' + (t.side === 'buy' ? 'BUY' : 'SELL') + '</span>' +
+    (t.volume != null ? ' ' + nf(t.volume) + ' лот' : '') + (g ? ' · <span class="xr ' + g[0] + '">' + g[1] + '</span>' : '') +
+    ' · <b class="' + cls(t.net) + '">' + money(+t.net) + '</b> <span class="mut">· ' + dt(t.openTime || t.closeTime) + ' → ' + dt(t.closeTime) + '</span>';
+  $('#hvS').textContent = 'Загружаю график cTrader…';
+  const cv = $('#hvC'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+  b.classList.add('on'); hvPlace(ev);
+  try {
+    const res = await hvData(t, ctid);
+    if (hvId !== id) return;
+    if (!res.data.length) { $('#hvS').textContent = 'cTrader не вернул свечей за этот период'; return; }
+    hvDraw(t, res);
+    $('#hvS').textContent = 'cTrader · ' + res.iv.toUpperCase() + ' · нажми на строку, чтобы открыть сделку и сменить таймфрейм';
+  } catch (e) { if (hvId === id) $('#hvS').textContent = 'cTrader: ' + String(e.message || e).slice(0, 90); }
+}
+(() => {
+  const tb = document.getElementById('tbody'); if (!tb) return;
+  const canHover = () => !window.matchMedia || matchMedia('(hover: hover) and (pointer: fine)').matches;
+  let lastEv = null;
+  tb.addEventListener('mouseover', e => {
+    if (!canHover()) return;
+    const tr = e.target.closest('tr[data-tid]'); if (!tr) return;
+    const id = tr.dataset.tid; lastEv = e;
+    if (hvId === id) return;
+    hvHide(); hvId = id;
+    hvTimer = setTimeout(() => hvShow(id, lastEv), 350);
+  });
+  tb.addEventListener('mousemove', e => { lastEv = e; hvPlace(e); });
+  tb.addEventListener('mouseleave', hvHide);
+  window.addEventListener('scroll', hvHide, true);
+})();
+
 /* поля-ключи скрыты как пароль; глаз — показать на время, при уходе со страницы снова скрываются */
 document.addEventListener('click', e => {
   const b = e.target.closest('.pwbtn'); if (!b) return;
