@@ -6735,6 +6735,8 @@ function appInfo() {
     n.innerHTML = '<span class="up">Установлено как приложение.</span> Работает без интернета. Обновления подтягиваются сами при следующем запуске.';
   } else if (instEvt) {
     n.innerHTML = 'Можно поставить дневник как отдельное приложение: значок на рабочем столе или главном экране, своё окно, работа без интернета.';
+  } else if (/Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(navigator.userAgent)) {
+    n.innerHTML = 'Safari на Mac: в меню сверху <b>Файл → Добавить в Dock…</b> (или кнопка <b>Поделиться</b> справа от адресной строки → <b>Добавить в Dock</b>) → <b>Добавить</b>. Нужна macOS 14 Sonoma или новее; на старой macOS установи через Chrome или Edge.';
   } else if (isIOS) {
     n.innerHTML = 'На iPhone: открой этот адрес в <b>Safari</b> → кнопка <b>Поделиться</b> (квадрат со стрелкой) → <b>На экран «Домой»</b>.';
   } else {
