@@ -431,6 +431,12 @@ canvas{cursor:crosshair}
 .hvh{font-size:12.5px;margin-bottom:6px;color:#c9d1d9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hvs{font-size:11px;color:#8b949e;margin-top:5px}
 #hvC{width:100%;display:block}
+.pnlp{font-size:10.5px;font-weight:400;opacity:.75;margin-top:1px}
+#tbody tr.grp td{background:rgba(59,130,246,.09);transition:background .12s}
+#tbody tr.grp td:first-child{box-shadow:inset 3px 0 0 var(--acc)}
+#tbody tr.grp-first td{border-top-color:rgba(59,130,246,.45)}
+#tbody tr.grp-last td{border-bottom:1px solid rgba(59,130,246,.45)}
+#tbody tr.grp:hover td{background:rgba(59,130,246,.16)}
 /* ---------- планшеты и узкие окна ---------- */
 @media(max-width:1100px){
   .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -1645,7 +1651,7 @@ function renderDash() {
       : 'Пока нет сделок — импортируй CSV или добавь вручную';
   }
   const K = [
-    ['Чистый P&L', money(st.net), cls(st.net), st.n + ' сделок'],
+    ['Чистый P&L', money(st.net), cls(st.net), (S.balance ? pctTxt(st.net / S.balance * 100) + ' от депозита · ' : '') + st.n + ' сделок'],
     ['Винрейт', nf(st.wr, 1) + '%', st.wr >= 50 ? 'up' : '', st.wins + 'W / ' + st.losses + 'L'],
     ['Profit factor', st.pf === Infinity ? '∞' : nf(st.pf), st.pf >= 1.5 ? 'up' : st.pf < 1 ? 'dn' : '', 'прибыль / убыток'],
     ['Матожидание', money(st.exp), cls(st.exp), 'на сделку'],
@@ -1666,7 +1672,7 @@ function renderDash() {
     '<div class="mut" style="font-size:11.5px">' + dt(t.closeTime) +
     (t.openPrice ? ' · ' + nf(t.openPrice, px(t.symbol)) + ' → ' + nf(t.closePrice, px(t.symbol)) : '') +
     (t.setup ? ' · ' + esc(t.setup) : '') + '</div></div>' +
-    '<div class="' + cls(t.net) + '" style="font-weight:600;white-space:nowrap">' + money(t.net) + '</div></div>').join('')
+    '<div class="' + cls(t.net) + '" style="font-weight:600;white-space:nowrap;text-align:right">' + money(t.net) + '<div class="pnlp">' + pctTxt(netPct(t)) + '</div></div></div>').join('')
     : '<div class="empty">Нет сделок</div>';
 }
 
@@ -1771,6 +1777,12 @@ function calOpen(k) {
   if (calAll) toast('Показаны сделки активного счёта «' + S.name + '» за этот день');
 }
 
+/* P&L в процентах: от баланса перед сделкой (если cTrader его прислал), иначе от начального депозита */
+function netPct(t) {
+  const base = t.balAfter != null && !isNaN(+t.balAfter) ? +t.balAfter - (+t.net || 0) : +S.balance;
+  return base > 0 ? (+t.net || 0) / base * 100 : null;
+}
+const pctTxt = v => v == null || isNaN(v) ? '' : (v > 0 ? '+' : '') + nf(v, 2) + '%';
 /* Метка закрытия: плюс — TP (при частичном закрытии одной позиции — TP1, TP2…), минус — SL, около нуля — БУ.
    Как именно закрылось (тейк, перенесённый стоп, вручную) — во всплывающей подсказке. */
 let TAG_PARTS = null;
@@ -1801,11 +1813,12 @@ function tradeTagHtml(t) {
 }
 
 /* ---------------- render: trades ---------------- */
-let tPage = 1;
+let tPage = 1, POS_N = {};
 function renderTrades() {
+  POS_N = {}; TR.forEach(x => { if (x.posId) POS_N[x.posId] = (POS_N[x.posId] || 0) + 1; });
   const arr = sorted(filtered());
   const st = stats(arr);
-  $('#tradesCount').innerHTML = arr.length + ' из ' + TR.length + ' · P&L <span class="' + cls(st.net) + '">' + money(st.net) + '</span> · винрейт ' + nf(st.wr, 1) + '%';
+  $('#tradesCount').innerHTML = arr.length + ' из ' + TR.length + ' · P&L <span class="' + cls(st.net) + '">' + money(st.net) + (S.balance ? ' (' + pctTxt(st.net / S.balance * 100) + ')' : '') + '</span> · винрейт ' + nf(st.wr, 1) + '%';
   // страница
   const sizeV = $('#tSize').value;
   const size = sizeV === 'all' ? Math.max(1, arr.length) : +sizeV;
@@ -1817,7 +1830,8 @@ function renderTrades() {
   $('#tbody').innerHTML = page.length ? page.map(t => {
     const r = R(t), p = calcPips(t), d = px(t.symbol);
     const tps = (t.tps || []).filter(x => x.price);
-    return '<tr data-tid="' + t.id + '" onclick="hvHide();openTrade(\'' + t.id + '\')">' +
+    const grp = t.posId && POS_N[t.posId] > 1;
+    return '<tr data-tid="' + t.id + '"' + (grp ? ' data-pos="' + esc(t.posId) + '" class="inpos"' : '') + ' onclick="hvHide();openTrade(\'' + t.id + '\')">' +
       '<td>' + dt(t.closeTime) + '</td>' +
       '<td class="mut">' + dt(t.openTime) + '</td>' +
       '<td><b>' + esc(t.symbol) + '</b></td>' +
@@ -1835,7 +1849,7 @@ function renderTrades() {
         : '<td class="num mut">' + (tps.length ? tps.map(x => nf(x.price, d) + (x.hit ? ' ✓' : '')).join(' / ') : (t.tp != null ? nf(t.tp, d) : '—')) + '</td>') +
       '<td class="num ' + cls(p) + '">' + (p === null ? '—' : nf(p, 1)) + '</td>' +
       '<td class="num ' + cls(r) + '">' + (r === null ? '—' : nf(r) + 'R') + '</td>' +
-      '<td class="num ' + cls(t.net) + '"><b>' + money(t.net) + '</b></td>' +
+      '<td class="num ' + cls(t.net) + '"><b>' + money(t.net) + '</b><div class="pnlp">' + pctTxt(netPct(t)) + '</div></td>' +
       '<td>' + (t.setup ? '<span class="pill">' + esc(t.setup) + '</span>' : '') + '</td>' +
       '<td class="mut" style="max-width:240px;overflow:hidden;text-overflow:ellipsis">' + esc((t.reason || t.review || '').slice(0, 70)) + (t.shots && t.shots.length ? ' 📎' : '') + '</td></tr>';
   }).join('') : '<tr><td colspan="14"><div class="empty"><div class="big">≡</div>Сделок не найдено</div></td></tr>';
@@ -6699,7 +6713,19 @@ async function hvShow(id, ev) {
     hvTimer = setTimeout(() => hvShow(id, lastEv), 350);
   });
   tb.addEventListener('mousemove', e => { lastEv = e; hvPlace(e); });
-  tb.addEventListener('mouseleave', hvHide);
+  tb.addEventListener('mouseleave', () => { hvHide(); tb.querySelectorAll('tr.grp').forEach(r => r.classList.remove('grp', 'grp-first', 'grp-last')); });
+  /* части одной позиции (TP1, TP2…) подсвечиваются вместе */
+  tb.addEventListener('mouseover', e => {
+    const tr = e.target.closest('tr'); if (!tr) return;
+    const pos = tr.dataset.pos || '';
+    if (tb.dataset.hlpos === pos) return;
+    tb.dataset.hlpos = pos;
+    tb.querySelectorAll('tr.grp').forEach(r => r.classList.remove('grp', 'grp-first', 'grp-last'));
+    if (!pos) return;
+    const rows = [...tb.querySelectorAll('tr[data-pos]')].filter(r => r.dataset.pos === pos);
+    rows.forEach(r => r.classList.add('grp'));
+    if (rows.length) { rows[0].classList.add('grp-first'); rows[rows.length - 1].classList.add('grp-last'); }
+  });
   window.addEventListener('scroll', hvHide, true);
 })();
 
