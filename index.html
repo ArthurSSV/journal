@@ -1314,7 +1314,8 @@ canvas{cursor:crosshair}
     <div class="mbody">
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         <div class="field"><label>Период</label>
-          <select id="r_scope"><option value="day">За день</option><option value="week">За неделю</option><option value="month" selected>За месяц</option></select></div>
+          <select id="r_scope"><option value="day">За день</option><option value="week">За неделю</option><option value="month" selected>За месяц</option><option value="range">Свой период</option></select></div>
+        <div class="field" id="r_rangeBox" style="display:none"><label>С какого по какое</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="r_from" type="date" style="min-width:0"><span class="mut">—</span><input id="r_to" type="date" style="min-width:0"></div></div>
         <div class="field" id="r_dayBox" style="display:none"><label>День</label><select id="r_day"></select></div>
         <div class="field" id="r_weekBox" style="display:none"><label>Неделя</label><select id="r_week"></select></div>
       </div>
@@ -5328,7 +5329,12 @@ try { Object.assign(PROF, JSON.parse(localStorage.getItem(LS_P)) || {}); } catch
 
 function openReport() {
   const days = jDays();
-  if (!days.length) return toast('В этом месяце нет заполненных дней');
+  if (!JR.length) return toast('В журнале ещё нет заполненных дней');
+  // свой период по умолчанию — выбранный месяц (или последние 30 дней журнала)
+  const all = JR.map(d => d.date).sort();
+  if (!$('#r_from').value) $('#r_from').value = days.length ? days[0].date : all[Math.max(0, all.length - 30)];
+  if (!$('#r_to').value) $('#r_to').value = days.length ? days[days.length - 1].date : all[all.length - 1];
+  if (!days.length) $('#r_scope').value = 'range';
   $('#r_day').innerHTML = days.map(d => '<option value="' + d.date + '">' + dFull(d.date + 'T00:00:00Z') + ' · ' + esc(d.accent || '') + '</option>').join('');
   $('#r_day').value = days[days.length - 1].date;
   const weeks = [...new Set(days.map(d => d.week || jWeekOf(d.date)))].sort();
@@ -5342,10 +5348,16 @@ function rScope() {
   const s = $('#r_scope').value;
   $('#r_dayBox').style.display = s === 'day' ? '' : 'none';
   $('#r_weekBox').style.display = s === 'week' ? '' : 'none';
+  $('#r_rangeBox').style.display = s === 'range' ? '' : 'none';
   $('#r_info').textContent = 'В отчёт войдёт: ' + nDays(repDays().length);
 }
 function repDays() {
   const s = $('#r_scope').value, days = jDays();
+  if (s === 'range') {
+    let a = $('#r_from').value, b = $('#r_to').value;
+    if (a && b && a > b) [a, b] = [b, a];
+    return JR.filter(d => (!a || d.date >= a) && (!b || d.date <= b)).sort((x, y) => x.date.localeCompare(y.date));
+  }
   if (s === 'day') return days.filter(d => d.date === $('#r_day').value);
   if (s === 'week') return days.filter(d => (d.week || jWeekOf(d.date)) === +$('#r_week').value);
   return days;
@@ -5368,6 +5380,7 @@ async function buildReport(days) {
   const scope = $('#r_scope').value;
   const title = scope === 'day' ? 'Отчёт за ' + dFull(days[0].date + 'T00:00:00Z')
     : scope === 'week' ? 'Отчёт за неделю ' + (days[0].week || jWeekOf(days[0].date)) + ' · ' + jMonthName($('#jMonth').value)
+      : scope === 'range' ? 'Отчёт за период ' + dFull(days[0].date + 'T00:00:00Z') + ' — ' + dFull(days[days.length - 1].date + 'T00:00:00Z')
       : 'Отчёт за ' + jMonthName($('#jMonth').value);
 
   const tot = days.map(dayTotals);
@@ -5378,7 +5391,7 @@ async function buildReport(days) {
   const mkAvg = days.reduce((s, d) => s + mkDone(d), 0) / days.length;
   const goalDays = tot.filter(x => x.entries && x.profitPct >= (+S.goalDay || 1)).length;
   const over = tot.filter(x => x.profitPct <= -(+S.ddLimit || 2)).length;
-  const goal = scope === 'day' ? +S.goalDay || 1 : scope === 'week' ? +S.goalWeek || 5 : +S.goalMonth || 20;
+  const goal = scope === 'day' || (scope === 'range' && days.length <= 1) ? +S.goalDay || 1 : scope === 'week' || (scope === 'range' && days.length <= 7) ? +S.goalWeek || 5 : +S.goalMonth || 20;
 
   const kpi = (k, v, x, cl) => '<div class="rk"><div class="rkk">' + k + '</div><div class="rkv ' + (cl || '') + '">' + v + '</div><div class="rkx">' + (x || '') + '</div></div>';
   let h = '<div class="rpage">';
@@ -5398,8 +5411,11 @@ async function buildReport(days) {
     '</div>';
 
   if (rOpt('totals') && scope !== 'day') {
-    const weeks = [...new Set(days.map(d => d.week || jWeekOf(d.date)))].sort();
-    const pick = w => days.map((d, i) => tot[i]).filter((x, i) => (days[i].week || jWeekOf(days[i].date)) === w);
+    const monday = ds => { const t = Date.parse(ds + 'T00:00:00Z'), dw = (new Date(t).getUTCDay() + 6) % 7; return new Date(t - dw * 864e5).toISOString().slice(0, 10); };
+    const wk = d => scope === 'range' ? monday(d.date) : (d.week || jWeekOf(d.date));
+    const weeks = [...new Set(days.map(wk))].sort();
+    const pick = w => days.map((d, i) => tot[i]).filter((x, i) => wk(days[i]) === w);
+    const wName = w => scope === 'range' ? 'Нед. с ' + w.slice(8, 10) + '.' + w.slice(5, 7) : 'Неделя ' + w;
     const R = [
       ['Дней заполнено', p => p.length, 0],
       ['Входов', p => p.reduce((s, x) => s + x.entries, 0), 0],
@@ -5413,7 +5429,7 @@ async function buildReport(days) {
     ];
     const fmt = (v, d) => v == null ? '—' : d === 'p' ? nf(v, 0) + '%' : d === 'pp' ? (v > 0 ? '+' : '') + nf(v, 2) + '%' : nf(v, d);
     h += '<h3 class="rh">Итоги по неделям</h3><table class="rtab"><thead><tr><th>Показатель</th>' +
-      weeks.map(w => '<th class="n">Неделя ' + w + '</th>').join('') + '<th class="n">Итого</th></tr></thead><tbody>';
+      weeks.map(w => '<th class="n">' + wName(w) + '</th>').join('') + '<th class="n">Итого</th></tr></thead><tbody>';
     R.forEach(r => {
       if (r[0] === 'Тейки / Стопы') {
         h += '<tr><td>Тейки / Стопы</td>' + weeks.map(w => { const p = pick(w); return '<td class="n">' + p.reduce((s, x) => s + x.takes, 0) + ' / ' + p.reduce((s, x) => s + x.stops, 0) + '</td>'; }).join('') +
@@ -6775,6 +6791,7 @@ $('#anFrom').onchange = $('#anTo').onchange = renderStats;
 $('#jMask').onclick = e => { if (e.target.id === 'jMask') closeDay(); };
 $('#rMask').onclick = e => { if (e.target.id === 'rMask') closeReport(); };
 $('#r_scope').onchange = rScope;
+$('#r_from').onchange = $('#r_to').onchange = rScope;
 $('#r_day').onchange = rScope;
 $('#r_week').onchange = rScope;
 $('#r_opts').onclick = e => { if (e.target.classList.contains('tag')) e.target.classList.toggle('on'); };
