@@ -1168,6 +1168,7 @@ canvas{cursor:crosshair}
           <span id="jAccPick"></span>
           <span class="mut" id="jtSrc" style="font-size:11.5px"></span>
           <button class="btn sm" onclick="pullTrades()">↧ Из cTrader</button>
+          <button class="btn sm" onclick="jtAllCharts()" title="Добавить к каждому входу график сделки из cTrader">📈 Графики</button>
           <button class="btn sm" onclick="addJTrade()">+ вход</button>
         </div>
       </div>
@@ -3501,6 +3502,59 @@ function jAccRender() {
     jAccRender(); pullTrades(true); jtRender();
   });
 }
+/* ---------- график сделки из cTrader — картинкой ко входу журнала дня ---------- */
+let jtChartBusy = false;
+function jtChartCanvas() {
+  let c = document.getElementById('jtChartC');
+  if (!c) { c = document.createElement('canvas'); c.id = 'jtChartC'; c.style.cssText = 'position:fixed;left:-12000px;top:0;width:1100px;height:440px'; document.body.appendChild(c); }
+  return c;
+}
+function jtSrcTrade(row) {
+  if (!row || !row.srcId) return null;
+  const acc = jAcc(row).id, t = accTrades(acc).find(x => x.id === row.srcId);
+  return t ? { t: Object.assign({ _acc: acc }, t), ctid: typeof ctCtidFor === 'function' ? ctCtidFor(acc) : null } : null;
+}
+async function jtAddChart(i, quiet) {
+  const row = draftJT[i], src = jtSrcTrade(row);
+  if (!src) { if (!quiet) toast('Этот вход внесён вручную — графику cTrader не к чему привязаться'); return false; }
+  if (!src.ctid || !gdReady()) { if (!quiet) toast('Счёт не подключён к cTrader: Настройки → cTrader'); return false; }
+  if (row.chartShot && (row.shots || []).includes(row.chartShot)) { if (!quiet) toast('График этого входа уже добавлен'); return false; }
+  if (!quiet) toast('Загружаю график входа ' + (i + 1) + ' из cTrader…');
+  try {
+    const res = await hvData(src.t, src.ctid);
+    if (!res.data.length) { if (!quiet) toast('cTrader не вернул свечей за этот период'); return false; }
+    jtChartCanvas();
+    const sv = [cdData, cdOverlay, cdView, cdHover, editId];
+    cdData = res.data; cdOverlay = res.ov; cdView = null; cdHover = null; editId = src.t.id;
+    let url;
+    try { drawCandlesInto('#jtChartC', 440, false); url = document.getElementById('jtChartC').toDataURL('image/jpeg', 0.9); }
+    finally { [cdData, cdOverlay, cdView, cdHover, editId] = sv; }
+    if (draftJT[i] !== row) return false;                     // день закрыли или строки пересобрали
+    const id = uid(); await putShot(id, url);
+    row.shots = row.shots || []; row.shots.unshift(id); row.chartShot = id;
+    drawJtShots(i);
+    if (!quiet) toast('График входа ' + (i + 1) + ' добавлен');
+    return true;
+  } catch (e) { if (!quiet) toast('cTrader: ' + String(e.message || e).slice(0, 80)); return false; }
+}
+async function jtAllCharts(quiet) {
+  if (jtChartBusy) return;
+  const idx = draftJT.map((r, i) => i).filter(i => draftJT[i].srcId && !(draftJT[i].chartShot && (draftJT[i].shots || []).includes(draftJT[i].chartShot)));
+  if (!idx.length) { if (!quiet) toast('Графики всех входов из cTrader уже добавлены'); return; }
+  jtChartBusy = true; let ok = 0;
+  try {
+    for (let k = 0; k < idx.length; k++) {
+      if (!$('#jMask').classList.contains('on')) break;
+      toast('Графики из cTrader: ' + (k + 1) + ' из ' + idx.length + '…');
+      if (await jtAddChart(idx[k], true)) ok++;
+    }
+  } finally { jtChartBusy = false; }
+  toast(ok ? 'Добавлено графиков из cTrader: ' + ok : 'Графики не загрузились — проверь подключение cTrader в Настройках');
+}
+function jtAutoCharts() {
+  if (typeof CT === 'undefined' || !Object.keys(CT.links || {}).length || !gdReady()) return;
+  if (draftJT.some(r => r.srcId && !r.chartShot)) setTimeout(() => jtAllCharts(true), 80);
+}
 function pullTrades(silent) {
   const date = $('#j_date').value;
   if (!date) return;
@@ -3515,6 +3569,7 @@ function pullTrades(silent) {
   draftJT.sort((x, y) => (x.time || '99:99').localeCompare(y.time || '99:99'));   // по времени, вперемешку со всех счетов
   if (!draftJT.length) draftJT = [newJTrade()];
   jtRender();
+  jtAutoCharts();                                   // графики новых входов подтягиваются сами
   if (!silent) toast('Перенесено ' + src.length +
     (draftJT.length > MAXTRADES ? ' · входов за день ' + draftJT.length + ', по плану не больше ' + MAXTRADES : ''));
 }
@@ -3583,6 +3638,7 @@ function jtRender() {
     '<span class="pill" style="flex:0 0 auto">Вход ' + (i + 1) + '</span>' +
     '<input placeholder="ссылка на TradingView" value="' + esc(t.link || '') + '" data-ni="' + i + '" data-nk="link" style="flex:0 0 220px">' +
     '<input placeholder="разбор сделки: что сделал верно, что улучшить" value="' + esc(t.review || '') + '" data-ni="' + i + '" data-nk="review" style="flex:1">' +
+    (t.srcId ? '<button class="btn sm" style="flex:0 0 auto" onclick="jtAddChart(' + i + ')" title="График этой сделки из cTrader — картинкой к входу">📈 график</button>' : '') +
     '<div class="drop tfdrop" data-jtdrop="' + i + '" style="flex:0 0 auto">+ скрин</div></div>' +
     '<div class="shots" data-jtshots="' + i + '"></div></div>').join('');
   $$('#jtNotes input').forEach(n => n.oninput = e => { draftJT[+e.target.dataset.ni][e.target.dataset.nk] = e.target.value; });
