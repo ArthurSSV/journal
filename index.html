@@ -1323,7 +1323,8 @@ canvas{cursor:crosshair}
       <div class="field"><label>Имя трейдера</label><input id="r_name" placeholder="как подписать отчёт"></div>
       <div class="field"><label>Что включить</label>
         <div class="tagrow" id="r_opts">
-          <span class="tag on" data-o="shots">Скриншоты разметки</span>
+          <span class="tag on" data-o="shots">Скриншоты и графики сделок</span>
+          <span class="tag" data-o="markup">Разметка D1→M1</span>
           <span class="tag on" data-o="trades">Сделки из cTrader</span>
           <span class="tag on" data-o="check">Чек-лист по пунктам</span>
           <span class="tag on" data-o="totals">Итоги по неделям</span>
@@ -5525,6 +5526,7 @@ async function buildReport(days) {
         }).join('') + '</div></div>';
     }
 
+    if (rOpt('markup')) {
     h += '<div class="rmk"><div class="rmkt">Разметка сверху вниз · разобрано ' + mkDone(d) + ' из 5</div>';
     for (const tf of TFS) {
       const st = mk[tf[0]];
@@ -5532,7 +5534,7 @@ async function buildReport(days) {
         (st.done ? '<span class="g">разобран</span>' : '<span class="r">не разобран</span>') +
         (st.link ? ' <span class="mut">· ' + esc(st.link) + '</span>' : '') + '</div>' +
         (st.note ? '<div class="rtfn">' + esc(st.note) + '</div>' : '<div class="rtfn mut">— описания нет —</div>');
-      if (rOpt('shots') && st.shots.length) {
+      if (st.shots.length) {
         h += '<div class="rimgs">';
         for (const id of st.shots) { const data = await getShot(id); if (data) h += '<img src="' + data + '">'; }
         h += '</div>';
@@ -5540,6 +5542,7 @@ async function buildReport(days) {
       h += '</div>';
     }
     h += '</div>';
+    }
 
     const trs = jTrades(d).filter(jDone);
     const shotCache = {};
