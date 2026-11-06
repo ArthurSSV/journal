@@ -6853,7 +6853,14 @@ $('#r_scope').onchange = rScope;
 $('#r_from').onchange = $('#r_to').onchange = rScope;
 $('#r_day').onchange = rScope;
 $('#r_week').onchange = rScope;
-$('#r_opts').onclick = e => { if (e.target.classList.contains('tag')) e.target.classList.toggle('on'); };
+/* выбор «что включить» в отчёт запоминается */
+try { const ro = JSON.parse(localStorage.getItem('fxj.ropts.v1')) || null; if (ro) $$('#r_opts .tag').forEach(t => { if (t.dataset.o in ro) t.classList.toggle('on', !!ro[t.dataset.o]); }); } catch (e) {}
+$('#r_opts').onclick = e => {
+  if (!e.target.classList.contains('tag')) return;
+  e.target.classList.toggle('on');
+  const ro = {}; $$('#r_opts .tag').forEach(t => ro[t.dataset.o] = t.classList.contains('on'));
+  try { localStorage.setItem('fxj.ropts.v1', JSON.stringify(ro)); } catch (x) {}
+};
 $('#fPeriod').onchange = renderDash;
 $('#calGrid').addEventListener('mousemove', calHover);
 $('#calGrid').addEventListener('mouseleave', () => $('#tip').classList.remove('on', 'wide'));
