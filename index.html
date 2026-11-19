@@ -1011,20 +1011,23 @@ canvas{cursor:crosshair}
         <div class="card" id="ctCard" style="grid-column:1/-1">
           <h2>cTrader — сделки загружаются сами</h2>
           <p class="mut" style="font-size:12.5px;margin-bottom:12px">Прямое подключение к cTrader Open API, <b>только просмотр</b> (scope «accounts») — дневник не может открыть или закрыть сделку.
-            Client Secret и токены хранятся в твоём мосте Google, в дневник не записываются.</p>
+            Ключи приложения и токены доступа хранятся на сервере дневника, в сам дневник не записываются.</p>
           <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
             <div>
-              <div class="fgtitle" style="margin-bottom:6px">1. Ключи приложения</div>
+              <div class="fgtitle" style="margin-bottom:6px">1. Подключение</div>
+              <div id="ctConnBox" style="margin-bottom:10px"></div>
+              <details class="ctown"><summary class="mut" style="font-size:12px;cursor:pointer">Своё приложение cTrader (через скрипт Google)</summary><div style="margin-top:10px">
               <div class="field"><label>Client ID</label><div class="pwbox"><input id="ctId" type="password" autocomplete="new-password" spellcheck="false" placeholder="из Applications → Credentials"><button type="button" class="pwbtn" data-pw="ctId" title="Показать / скрыть">👁</button></div></div>
               <div class="field"><label>Client Secret</label><div class="pwbox"><input id="ctSecret" type="password" autocomplete="new-password" spellcheck="false" placeholder="хранится только в мосте"><button type="button" class="pwbtn" data-pw="ctSecret" title="Показать / скрыть">👁</button></div></div>
               <div class="row" style="gap:6px"><button class="btn sm pri" onclick="ctSaveKeys()">Сохранить в мост</button></div>
               <div class="mut" style="font-size:11.5px;margin-top:10px;line-height:1.6">В портале cTrader: <b>Applications → Edit → Redirect URIs</b> добавь этот адрес:<br>
                 <code id="ctRedir" style="word-break:break-all;color:var(--tx)"></code> <button class="btn sm" onclick="ctRedirShow=!ctRedirShow;fillCT()">👁</button> <button class="btn sm" onclick="navigator.clipboard.writeText(SY.gdUrl||'').then(()=>toast('Адрес скопирован'))">Копировать</button></div>
+              <div class="row" style="gap:6px;margin-top:10px"><button class="btn sm" onclick="ctAuthorize()">Выдать доступ через скрипт</button></div>
+              </div></details>
             </div>
             <div>
-              <div class="fgtitle" style="margin-bottom:6px">2. Доступ и счета</div>
+              <div class="fgtitle" style="margin-bottom:6px">2. Счета</div>
               <div class="row" style="gap:6px;margin-bottom:10px">
-                <button class="btn sm" onclick="ctAuthorize()">Подключить cTrader</button>
                 <button class="btn sm" onclick="ctLoadAccounts()">Загрузить счета</button>
                 <button class="btn sm pri ctSyncBtn" onclick="ctSync()">⟳ Синхронизировать</button>
                 <button class="btn sm ctSyncBtn" onclick="ctRecheck()" title="Заново прочитать стопы, тейки и причину закрытия у всех сделок">Перепроверить SL/TP</button>
@@ -4801,13 +4804,87 @@ function gsClose() { $('#gsMask').classList.remove('on'); $('#gsFrame').src = 'a
    в дневник секрет приходит только на время синхронизации и нигде не сохраняется.
    Связь с cTrader — WebSocket JSON: wss://live.ctraderapi.com:5036 (демо — demo.ctraderapi.com:5036). */
 const LS_CT = 'fxj.ct.v1';
-let CT = { clientId: '', connected: false, expires: 0, accounts: [], links: {}, last: {}, tz: 'auto', auto: true, from: '' };
+let CT = { conn: '', clientId: '', connected: false, expires: 0, accounts: [], links: {}, last: {}, tz: 'auto', auto: true, from: '' };
 try { Object.assign(CT, JSON.parse(localStorage.getItem(LS_CT)) || {}); } catch (e) {}
 function saveCT() { localStorage.setItem(LS_CT, JSON.stringify(CT)); }
 let ctBusy = false, ctRedirShow = false;
 const CT_PT = { APP_AUTH: 2100, APP_AUTH_RES: 2101, ACC_AUTH: 2102, ACC_AUTH_RES: 2103, SYMBOLS: 2114, SYMBOLS_RES: 2115, SYMBOL_BY_ID: 2116,
   TRADER: 2121, DEALS: 2133, ERROR: 2142, ACCOUNTS_BY_TOKEN: 2149, DEALS_BY_POS: 2179, HEARTBEAT: 51, COMMON_ERROR: 50, TOKEN_INVALID: 2147,
   TRENDBARS: 2137, ORDERS_BY_POS: 2183 };
+/* Сервер дневника (Cloudflare): одно общее приложение cTrader, ключи и токены — только на сервере.
+   Пользователь нажимает «Подключить cTrader», входит в cTrader ID — и всё. */
+const CT_SRV = 'https://fxj-ctrader.arthursorokav.workers.dev';
+const ctSrvMode = () => !!CT.conn;
+async function ctSrvCall(path, body, ms) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms || 90000);
+  try {
+    const r = await fetch(CT_SRV + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}), signal: ctl.signal });
+    const j = await r.json();
+    if (!j.ok) {
+      if (j.code === 'NO_CONN') { CT.conn = ''; CT.connected = false; saveCT(); }
+      const e = new Error(j.error || 'ошибка сервера'); e.code = j.code; throw e;
+    }
+    return j;
+  } catch (e) { if (e.name === 'AbortError') throw new Error('сервер cTrader не ответил вовремя'); if (e instanceof TypeError) throw new Error('нет связи с сервером cTrader (проверь интернет)'); throw e; }
+  finally { clearTimeout(t); }
+}
+/* «соединение» с тем же интерфейсом send(), что и WebSocket: каждый запрос идёт через сервер */
+function ctProxy(live) {
+  let ctid = null;
+  const one = async (pt, payload, ms) => {
+    const id = (payload && payload.ctidTraderAccountId) || ctid;
+    const j = await ctSrvCall('/api/batch', { conn: CT.conn, ctid: id, live: live !== false, calls: [{ pt, payload }] }, (ms || 60000) + 20000);
+    const r = (j.results || [])[0] || { ok: false, error: 'пустой ответ' };
+    if (!r.ok) { const e = new Error(r.error); e.code = r.code; throw e; }
+    return r.payload || {};
+  };
+  return {
+    srv: true,
+    async send(pt, payload, ms) {
+      if (pt === CT_PT.APP_AUTH) return {};
+      if (pt === CT_PT.ACC_AUTH) { ctid = payload.ctidTraderAccountId; return {}; }
+      if (pt === CT_PT.ACCOUNTS_BY_TOKEN) {
+        const j = await ctSrvCall('/api/accounts', { conn: CT.conn });
+        return { permissionScope: j.scope, ctidTraderAccount: (j.accounts || []).map(a => ({ ctidTraderAccountId: a.ctid, traderLogin: a.login, brokerTitleShort: a.broker, isLive: a.live })) };
+      }
+      return one(pt, payload, ms);
+    },
+    /* пакет запросов за один вызов сервера: [{pt, payload, pause}] → [{ok, payload|error, code}] */
+    async batch(calls) {
+      const id = (calls[0] && calls[0].payload && calls[0].payload.ctidTraderAccountId) || ctid;
+      const j = await ctSrvCall('/api/batch', { conn: CT.conn, ctid: id, live: live !== false, calls }, 30000 + calls.length * 4000);
+      return j.results || [];
+    },
+    close() {}, alive() { return true; }
+  };
+}
+let ctWait = null;
+function ctConnect() {
+  const st = Array.from(crypto.getRandomValues(new Uint8Array(18))).map(b => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'[b & 63]).join('');
+  const w = window.open(CT_SRV + '/auth/start?state=' + st, '_blank');
+  if (!w) location.href = CT_SRV + '/auth/start?state=' + st;
+  ctStatus('Открылось окно cTrader: войди, <b>отметь галочками счета</b> и нажми <b>Allow access</b>. Дневник подхватит подключение сам…');
+  clearInterval(ctWait); const t0 = Date.now();
+  ctWait = setInterval(async () => {
+    if (Date.now() - t0 > 15 * 60000) { clearInterval(ctWait); ctStatus('<span class="warn">Не дождался подтверждения cTrader. Нажми «Подключить cTrader» ещё раз.</span>'); return; }
+    try {
+      const j = await ctSrvCall('/auth/claim', { state: st }, 15000);
+      if (j.conn) {
+        clearInterval(ctWait);
+        CT.conn = j.conn; CT.connected = true; saveCT(); markDirty();
+        toast('cTrader подключён');
+        await ctLoadAccounts();
+      }
+    } catch (e) {}
+  }, 2500);
+}
+async function ctDisconnect() {
+  if (!confirm('Отключить cTrader? Загруженные сделки останутся в дневнике.')) return;
+  const c = CT.conn; CT.conn = ''; CT.connected = false; saveCT(); markDirty();
+  try { await ctSrvCall('/api/disconnect', { conn: c }, 15000); } catch (e) {}
+  fillCT(); ctStatus('cTrader отключён. Доступ можно также отозвать в cTrader ID → Settings → Open API.');
+}
+function ctReady() { return ctSrvMode() || gdReady(); }
 function ctStatus(html) { const n = $('#ctStatus'); if (n) n.innerHTML = html; const m = $('#ctImpStatus'); if (m) m.innerHTML = html; }
 
 /* --- соединение --- */
@@ -4848,12 +4925,14 @@ function ctOpen(live) {
   });
 }
 async function ctToken() {
+  if (ctSrvMode()) return { srv: true };
   const j = await gdCall('cttoken', null, null, 60000);
   if (!j.accessToken) throw new Error(j.error || 'мост не вернул токен — обнови код скрипта');
   CT.connected = true; CT.expires = j.expires || 0; CT.clientId = j.clientId || CT.clientId; saveCT();
   return j;
 }
 async function ctSession(live, tk) {
+  if (tk && tk.srv) return ctProxy(live);
   const c = await ctOpen(live);
   await c.send(CT_PT.APP_AUTH, { clientId: tk.clientId, clientSecret: tk.clientSecret });
   return c;
@@ -5013,7 +5092,7 @@ async function ctSync(quiet) {
   if (ctBusy) return;
   const links = Object.keys(CT.links).filter(k => accById(CT.links[k]));
   if (!links.length) { if (!quiet) ctStatus('<span class="warn">Нет привязанных счетов.</span> Нажми «Загрузить счета» и выбери, в какой счёт дневника класть сделки.'); return; }
-  if (!gdReady()) { if (!quiet) ctStatus('<span class="dn">Нужен подключённый Google Диск (мост)</span>'); return; }
+  if (!ctReady()) { if (!quiet) ctStatus('<span class="dn">Сначала нажми «Подключить cTrader»</span>'); return; }
   ctBusy = true; $$('.ctSyncBtn').forEach(b => b.disabled = true);
   CT_EMPTY = 0; CT_ERR = '';
   const rep = h => ctStatus('<span class="mut">' + h + '</span>');
@@ -5036,8 +5115,8 @@ async function ctSync(quiet) {
   } catch (e) {
     const m = String(e.message || e);
     ctStatus('<span class="dn">Синхронизация не удалась: ' + esc(m) + '</span>' +
-      (/CH_ACCESS_TOKEN_INVALID|ACCESS_TOKEN|не подключён|refresh/i.test(m) ? '<br><span class="mut">Нажми «Подключить cTrader» и выдай доступ заново.</span>' : '') +
-      (/CH_CLIENT_AUTH_FAILURE|client/i.test(m) ? '<br><span class="mut">Проверь Client ID и Secret (шаг 1).</span>' : ''));
+      (/CH_ACCESS_TOKEN_INVALID|ACCESS_TOKEN|не подключён|не найдено|NO_CONN|refresh/i.test(m) ? '<br><span class="mut">Нажми «Подключить cTrader» и выдай доступ заново.</span>' : '') +
+      (!ctSrvMode() && /CH_CLIENT_AUTH_FAILURE|client/i.test(m) ? '<br><span class="mut">Проверь Client ID и Secret (шаг 1).</span>' : ''));
     if (!quiet) toast('cTrader: ' + m);
   } finally { if (c) c.close(); ctBusy = false; $$('.ctSyncBtn').forEach(b => b.disabled = false); fillCT(); }
 }
@@ -5057,8 +5136,23 @@ async function ctEnrich(c, ctid, accId, report) {
   const todo = all.filter(t => /^\d+$/.test(String(t.posId || '').trim()) && (+t.slChk || 0) < 3).slice(-400);
   if (!todo.length) return 0;
   let n = 0;
+  const qOf = t => {
+    const o1 = ctUnwall(t.openTime || t.closeTime), c1 = ctUnwall(t.closeTime || t.openTime), now = Date.now() - 1000;
+    let to = Math.min(now, c1 + 6 * 36e5), from = Math.max(0, o1 - 6 * 36e5);
+    if (to - from > 6.9 * 864e5) from = to - 6.9 * 864e5;
+    return { ctidTraderAccountId: +ctid, positionId: +String(t.posId).trim(), fromTimestamp: Math.floor(from), toTimestamp: Math.floor(to) };
+  };
+  const pre = new Map();                     // через сервер — пачками по 25 позиций за один запрос
+  if (c.batch) {
+    for (let i = 0; i < todo.length; i += 25) {
+      const part = todo.slice(i, i + 25);
+      if (report) report('стопы и тейки: позиции ' + (i + 1) + '–' + (i + part.length) + ' из ' + todo.length);
+      try { const res = await c.batch(part.map(t => ({ pt: CT_PT.ORDERS_BY_POS, payload: qOf(t), pause: 220 }))); part.forEach((t, k) => { if (res[k] && res[k].ok) pre.set(t, res[k].payload || {}); }); }
+      catch (e) { CT_ERR = String(e.code || e.message || e); break; }
+    }
+  }
   for (const t of todo) {
-    if (report) report('стопы и тейки: позиция ' + esc(t.posId) + ' (' + (n + 1) + ' из ' + todo.length + ')');
+    if (!pre.has(t) && report) report('стопы и тейки: позиция ' + esc(t.posId) + ' (' + (n + 1) + ' из ' + todo.length + ')');
     try {
       const o1 = ctUnwall(t.openTime || t.closeTime), c1 = ctUnwall(t.closeTime || t.openTime);
       /* окно поиска: не в будущем и не длиннее недели — иначе cTrader отвечает INCORRECT_BOUNDARIES */
@@ -5066,8 +5160,8 @@ async function ctEnrich(c, ctid, accId, report) {
       let to = Math.min(now, c1 + 6 * 36e5), from = Math.max(0, o1 - 6 * 36e5);
       if (to - from > 6.9 * 864e5) from = to - 6.9 * 864e5;
       const q = { ctidTraderAccountId: +ctid, positionId: +String(t.posId).trim(), fromTimestamp: Math.floor(from), toTimestamp: Math.floor(to) };
-      let r;
-      try { r = await c.send(CT_PT.ORDERS_BY_POS, q); }
+      let r = pre.get(t);
+      if (!r) try { r = await c.send(CT_PT.ORDERS_BY_POS, q); }
       catch (e) {
         const code = String(e.code || e.message);
         if (/BLOCKED|LIMIT|FREQUENCY/i.test(code)) { await ctSleep(2500); r = await c.send(CT_PT.ORDERS_BY_POS, q); }      // лимит запросов — ждём и повторяем
@@ -5075,7 +5169,7 @@ async function ctEnrich(c, ctid, accId, report) {
           r = await c.send(CT_PT.ORDERS_BY_POS, Object.assign({}, q, { fromTimestamp: Math.floor(Math.max(0, c1 - 864e5)), toTimestamp: Math.floor(Math.min(now, c1 + 36e5)) }));
         } else throw e;
       }
-      await ctSleep(260);
+      if (!pre.has(t)) await ctSleep(260);
       if (!(r.order || []).length) { CT_EMPTY++; t.slChk = 3; continue; }
       const ords = (r.order || []).slice().sort((a, b) => +(b.utcLastUpdateTimestamp || 0) - +(a.utcLastUpdateTimestamp || 0));
       let sl = null, tp = null;
@@ -5181,6 +5275,10 @@ const CT_TAG = { sl: ['sl', 'SL'], tp: ['tp', 'TP'], slp: ['tp', 'SL+'], be: ['b
 
 function fillCT() {
   const box = $('#ctAccs'); if (!box) return;
+  const cb = $('#ctConnBox');
+  if (cb) cb.innerHTML = ctSrvMode()
+    ? '<div class="row" style="gap:8px;align-items:center"><span class="up"><b>✓ cTrader подключён</b></span><button class="btn sm" onclick="ctDisconnect()">Отключить</button><button class="btn sm" onclick="ctConnect()" title="Если добавились новые счета">Переподключить</button></div>'
+    : '<button class="btn pri" onclick="ctConnect()">Подключить cTrader</button><div class="mut" style="font-size:11.5px;margin-top:6px;line-height:1.5">Откроется вход cTrader ID — отметь счета и нажми <b>Allow access</b>. Больше ничего настраивать не нужно.</div>';
   if ($('#ctId') && !$('#ctId').value) $('#ctId').value = CT.clientId || '';
   if ($('#ctRedir')) $('#ctRedir').textContent = !SY.gdUrl ? '— сначала подключи Google Диск —' : ctRedirShow ? SY.gdUrl : SY.gdUrl.replace(/\/s\/[^/]+\//, '/s/••••••••••••/');
   if ($('#ctTz')) $('#ctTz').value = CT.tz == null ? 'auto' : String(CT.tz);
@@ -5902,7 +6000,7 @@ async function buildBackup(withKb) {
     if (d.markup) for (const t of TFS) for (const s of ((d.markup[t[0]] || {}).shots || [])) { const x = await getShot(s); if (x) shots[s] = x; }
     if (d.trades) for (const t of d.trades) for (const s of (t.shots || [])) { const x = await getShot(s); if (x) shots[s] = x; }
   }
-  const out = { v: 3, saved: Date.now(), accounts: ACC, trades, journal: JR, quotes: QS, reviews: RV, profile: PROF, kbList: KB, kbFolders: KBF, circles: CIRC, ct: { links: CT.links, last: CT.last, tz: CT.tz, auto: CT.auto, from: CT.from, accounts: CT.accounts, clientId: CT.clientId }, shots };
+  const out = { v: 3, saved: Date.now(), accounts: ACC, trades, journal: JR, quotes: QS, reviews: RV, profile: PROF, kbList: KB, kbFolders: KBF, circles: CIRC, ct: { conn: CT.conn, links: CT.links, last: CT.last, tz: CT.tz, auto: CT.auto, from: CT.from, accounts: CT.accounts, clientId: CT.clientId }, shots };
   if (withKb) {
     out.kbFiles = {};
     for (const f of KB) {
@@ -5923,7 +6021,7 @@ async function applyBackup(d) {
     if (d.profile) { PROF = d.profile; localStorage.setItem(LS_P, JSON.stringify(PROF)); }
     if (d.kbList) { KB = d.kbList; KBF = d.kbFolders || []; saveKB(); }
     if (d.circles) { CIRC = d.circles; saveCirc(); }
-    if (d.ct) { Object.assign(CT, d.ct); saveCT(); }
+    if (d.ct) { const keep = CT.conn; Object.assign(CT, d.ct); if (!CT.conn && keep && !('conn' in d.ct)) CT.conn = keep; saveCT(); }
     if (d.kbFiles) {
       for (const id in d.kbFiles) {
         const res = await fetch(d.kbFiles[id]);
@@ -6965,7 +7063,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 }
 /* хранилище браузера не должно чиститься само */
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-setTimeout(() => gdPull(true).then(() => { if (CT.auto !== false && Object.keys(CT.links || {}).length && gdReady()) ctSync(true); }), 1200);
+setTimeout(() => (gdReady() ? Promise.resolve(gdPull(true)).catch(() => {}) : Promise.resolve()).then(() => { if (CT.auto !== false && Object.keys(CT.links || {}).length && ctReady()) ctSync(true); }), 1200);
 </script>
 </body>
 </html>
