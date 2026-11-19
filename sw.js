@@ -1,6 +1,6 @@
 // Дневник трейдера — офлайн-режим.
 // Меняй VERSION при каждой выкладке новой версии, чтобы телефон и ПК подхватили обновление.
-const VERSION = 'v29-2026-11-19';
+const VERSION = 'v30-2026-11-19';
 const CACHE = 'journal-' + VERSION;
 const FILES = ['./', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png',

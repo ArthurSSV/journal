@@ -895,6 +895,7 @@ canvas{cursor:crosshair}
         <div class="row">
           <button class="btn" onclick="gsRefresh()" title="Обновить список с Google Диска">⟳</button>
           <button class="btn" onclick="gsMkdir()">+ Папка</button>
+          <button class="btn" onclick="gsPick()" title="Выбрать таблицы на Google Диске — можно сразу несколько">Из Google Диска</button>
           <button class="btn" onclick="gsLink()" title="Добавить таблицу, которая уже есть на Google Диске">По ссылке</button>
           <button class="btn pri" onclick="$('#gsFile').click()">+ Загрузить .xlsx</button>
         </div>
@@ -4776,6 +4777,59 @@ function gsCopy(id) {
   gsDo('btcopy', { id, name: n.trim() }, 'Копия создана');
 }
 function gsConvert(id) { gsDo('btconvert', { id }, 'Готово — рядом появилась Google Таблица'); }
+/* окно выбора файлов Google: выбранные таблицы становятся доступны дневнику и добавляются в «Бэктесты» */
+let gPickerLoaded = null;
+function gPickerLib() {
+  if (gPickerLoaded) return gPickerLoaded;
+  gPickerLoaded = new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = 'https://apis.google.com/js/api.js';
+    sc.onload = () => window.gapi.load('picker', { callback: res, onerror: () => rej(new Error('не загрузилось окно Google')) });
+    sc.onerror = () => { gPickerLoaded = null; rej(new Error('не загрузилось окно Google — проверь интернет')); };
+    document.head.appendChild(sc);
+  });
+  return gPickerLoaded;
+}
+async function gsPick() {
+  if (!gMode()) return toast('Эта кнопка работает при входе через Google (Настройки → Google Диск). Со скриптом используй «По ссылке»');
+  try {
+    await gToken(true);
+    if (!gTk.pk) return toast('На сервере не задан ключ G_PICKER_KEY');
+    await gPickerLib();
+    const P = google.picker;
+    const view = new P.DocsView(P.ViewId.DOCS).setMimeTypes(G_SHEET + ',' + G_XLSX + ',application/vnd.ms-excel').setIncludeFolders(true).setSelectFolderEnabled(false).setMode(P.DocsViewMode.LIST);
+    const to = gsHere();
+    new P.PickerBuilder().setOAuthToken(gTk.access_token).setDeveloperKey(gTk.pk).setAppId(gTk.app).setOrigin(location.origin)
+      .addView(view).enableFeature(P.Feature.MULTISELECT_ENABLED).setLocale('ru').setTitle('Выбери таблицы бэктестов')
+      .setCallback(d => { if (d[P.Response.ACTION] === P.Action.PICKED) gsPicked(d[P.Response.DOCUMENTS] || [], to); }).build().setVisible(true);
+  } catch (e) { toast('Google: ' + (e.message || e)); }
+}
+async function gsPicked(docs, to) {
+  to = to || await gDir('Бэктесты', await gRoot());
+  let ok = 0, fail = [];
+  for (let i = 0; i < docs.length; i++) {
+    const d = docs[i], id = d.id, name = d.name || '';
+    toast('Добавляю ' + (i + 1) + ' из ' + docs.length + ': ' + name);
+    try {
+      const m = await gJson('files/' + id + '?fields=id,name,mimeType,parents,capabilities(canEdit,canMoveItemWithinDrive)');
+      if (m.mimeType === G_SHEET) {
+        const old = (m.parents || [])[0];
+        if (old === to) { ok++; continue; }
+        try {                                                     // своя таблица — переезжает в «Бэктесты»
+          if (!(m.capabilities || {}).canMoveItemWithinDrive) throw 0;
+          await gJson('files/' + id + '?fields=id&addParents=' + to + (old ? '&removeParents=' + old : ''), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        } catch (e) {                                             // чужая — копия
+          await gJson('files/' + id + '/copy?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: m.name, parents: [to] }) });
+        }
+      } else {                                                    // Excel → Google Таблица рядом в «Бэктестах»
+        const blob = await (await gFetch('files/' + id + '?alt=media')).blob();
+        await gToSheet(m.name, blob, to);
+      }
+      ok++;
+    } catch (e) { fail.push(name); }
+  }
+  toast('Добавлено в «Бэктесты»: ' + ok + (fail.length ? ' · не получилось: ' + fail.join(', ') : ''));
+  gsRefresh(true);
+}
 function gsLink() {
   if (!gsNeed()) return;
   const v = prompt('Вставь ссылку на Google Таблицу или файл Excel на твоём Диске\n(свои таблицы переедут в папку «Бэктесты», чужие — скопируются)');
