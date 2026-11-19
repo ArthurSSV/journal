@@ -988,11 +988,14 @@ canvas{cursor:crosshair}
         <div class="card">
           <h2>Google Диск</h2>
           <p class="mut" style="font-size:12.5px;line-height:1.6;margin-bottom:12px">
-            Дневник сохраняет бэкап прямо на твой Диск и забирает его оттуда на любом устройстве.
-            Нужна разовая настройка на 5 минут — <a href="#" onclick="openGdHelp();return false">открыть инструкцию</a>.
+            Дневник сохраняет данные на твой Google Диск и забирает их оттуда на любом устройстве.
           </p>
+          <div id="gBox" style="margin-bottom:12px"></div>
+          <details id="gdOld" style="margin-bottom:10px"><summary class="mut" style="font-size:12px;cursor:pointer">Через свой скрипт Google (старый способ)</summary><div style="margin-top:10px">
+          <p class="mut" style="font-size:12px;margin-bottom:8px"><a href="#" onclick="openGdHelp();return false">Инструкция по скрипту</a></p>
           <div class="field"><label>Адрес веб-приложения (заканчивается на /exec)</label><div class="pwbox"><input id="gdUrl" type="password" autocomplete="new-password" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec"><button type="button" class="pwbtn" data-pw="gdUrl" title="Показать / скрыть">👁</button></div></div>
           <div class="field"><label>Секретное слово</label><div class="pwbox"><input id="gdSecret" type="password" autocomplete="new-password" spellcheck="false" placeholder="то же, что в скрипте"><button type="button" class="pwbtn" data-pw="gdSecret" title="Показать / скрыть">👁</button></div></div>
+          </div></details>
           <div class="grid" style="grid-template-columns:2fr 1fr">
             <div class="field"><label>Папка на Диске</label><input id="gdFolder" placeholder="Дневник трейдера"></div>
             <div class="field"><label>Хранить копий</label><input id="gdKeep" type="number" min="1" max="200" step="1"></div>
@@ -2540,7 +2543,7 @@ async function openTrade(id) {
   $('#mask').classList.add('on');
   cdData = null;
   $('#cdSrc').style.display = ctCtidFor(S.id) ? '' : 'none';
-  setTimeout(() => tradeView(ctCtidFor(S.id) && gdReady() && t ? 'candles' : 'schema'), 30);
+  setTimeout(() => tradeView(ctCtidFor(S.id) && ctReady() && t ? 'candles' : 'schema'), 30);
 }
 
 /* --- take profit levels --- */
@@ -2862,7 +2865,7 @@ function pickInterval(spanMs) {
 async function loadCandles() {
   const st = $('#cdStatus');
   const ctid = typeof ctCtidFor === 'function' ? ctCtidFor(S.id) : null;
-  if (ctid && gdReady() && $('#cdSrc').value !== 'quotes') return loadCandlesCT(ctid);
+  if (ctid && ctReady() && $('#cdSrc').value !== 'quotes') return loadCandlesCT(ctid);
   if (QS.src === 'off') { st.innerHTML = '<span class="dn">Котировки выключены — включи в Настройках</span>'; return; }
   const sym = $('#f_symbol').value.trim();
   const o = fromInput($('#f_openTime').value), c = fromInput($('#f_closeTime').value);
@@ -3521,7 +3524,7 @@ function jtSrcTrade(row) {
 async function jtAddChart(i, quiet) {
   const row = draftJT[i], src = jtSrcTrade(row);
   if (!src) { if (!quiet) toast('Этот вход внесён вручную — графику cTrader не к чему привязаться'); return false; }
-  if (!src.ctid || !gdReady()) { if (!quiet) toast('Счёт не подключён к cTrader: Настройки → cTrader'); return false; }
+  if (!src.ctid || !ctReady()) { if (!quiet) toast('Счёт не подключён к cTrader: Настройки → cTrader'); return false; }
   if (row.chartShot && (row.shots || []).includes(row.chartShot)) { if (!quiet) toast('График этого входа уже добавлен'); return false; }
   if (!quiet) toast('Загружаю график входа ' + (i + 1) + ' из cTrader…');
   try {
@@ -3556,7 +3559,7 @@ async function jtAllCharts(quiet) {
   toast(ok ? 'Добавлено графиков из cTrader: ' + ok : 'Графики не загрузились — проверь подключение cTrader в Настройках');
 }
 function jtAutoCharts() {
-  if (typeof CT === 'undefined' || !Object.keys(CT.links || {}).length || !gdReady()) return;
+  if (typeof CT === 'undefined' || !Object.keys(CT.links || {}).length || !ctReady()) return;
   if (draftJT.some(r => r.srcId && !r.chartShot)) setTimeout(() => jtAllCharts(true), 80);
 }
 function pullTrades(silent) {
@@ -4686,7 +4689,7 @@ function renderGS() {
     ? GS.files.length + ' ' + plural(GS.files.length, ['таблица', 'таблицы', 'таблиц']) + ' на Google Диске · обновлено ' + dt(new Date(GS.at - new Date(GS.at).getTimezoneOffset() * 60000).toISOString()) + (gsBusy ? ' · обновляю…' : '')
     : (gsBusy ? 'Загружаю список с Google Диска…' : 'Твои таблицы бэктестов — открываются и редактируются прямо здесь');
   let warn = '';
-  if (gsErr === 'nodrive') warn = '<div class="note" style="margin-bottom:12px">Бэктесты хранятся на твоём Google Диске. Сначала подключи Диск: <b>Настройки → Google Диск</b>. <button class="btn sm" onclick="go(\'settings\')">Открыть настройки</button></div>';
+  if (gsErr === 'nodrive') warn = '<div class="note" style="margin-bottom:12px">Бэктесты хранятся на твоём Google Диске. Сначала войди через Google: <b>Настройки → Google Диск → «Войти через Google»</b>. <button class="btn sm" onclick="go(\'settings\')">Открыть настройки</button></div>';
   else if (gsErr === 'oldscript') warn = '<div class="note" style="margin-bottom:12px;border-left-color:var(--warn)"><b>Нужно обновить код скрипта Google.</b> Старая версия не умеет работать с таблицами бэктестов. ' +
     'Открой <a href="#" onclick="openGdHelp();return false">инструкцию</a>, скопируй новый код, вставь вместо старого, затем <b>Развернуть → Управление развертываниями → ✏️ → Версия: новая → Развернуть</b>. Адрес останется прежним. ' +
     '<br><span class="mut">Дневник сейчас обращается к адресу, который заканчивается на <b style="color:var(--tx)">…' + esc(String(SY.gdUrl || '').replace(/\/exec.*$/, '').slice(-10)) + '/exec</b>. ' +
@@ -4725,7 +4728,7 @@ function renderGS() {
       '<button class="btn sm dgr" onclick="kbDel(\'' + f.id + '\').then(renderGS)">×</button></div></div>').join('');
   box.innerHTML = html;
 }
-function gsNeed() { if (!gdReady()) { toast('Сначала подключи Google Диск в Настройках'); return false; } if (gsErr === 'oldscript') { toast('Сначала обнови код скрипта Google'); return false; } return true; }
+function gsNeed() { if (!gdReady()) { toast('Сначала войди через Google: Настройки → Google Диск'); return false; } if (gsErr === 'oldscript') { toast('Сначала обнови код скрипта Google'); return false; } return true; }
 async function gsUpload(files) {
   if (!gsNeed()) return;
   const list = Array.from(files || []).filter(f => /\.(xlsx|xlsm|xls|csv)$/i.test(f.name));
@@ -4872,6 +4875,7 @@ function ctConnect() {
       if (j.conn) {
         clearInterval(ctWait);
         CT.conn = j.conn; CT.connected = true; saveCT(); markDirty();
+        if (SY.gSess) ctSrvCall('/g/ctset', { session: SY.gSess, conn: j.conn }, 15000).catch(() => {});
         toast('cTrader подключён');
         await ctLoadAccounts();
       }
@@ -4882,6 +4886,7 @@ async function ctDisconnect() {
   if (!confirm('Отключить cTrader? Загруженные сделки останутся в дневнике.')) return;
   const c = CT.conn; CT.conn = ''; CT.connected = false; saveCT(); markDirty();
   try { await ctSrvCall('/api/disconnect', { conn: c }, 15000); } catch (e) {}
+  if (SY.gSess) ctSrvCall('/g/ctset', { session: SY.gSess, conn: '' }, 15000).catch(() => {});
   fillCT(); ctStatus('cTrader отключён. Доступ можно также отозвать в cTrader ID → Settings → Open API.');
 }
 function ctReady() { return ctSrvMode() || gdReady(); }
@@ -6336,8 +6341,12 @@ function gdCopy() {
     .then(() => toast('Код скопирован — вставь его в script.google.com'))
     .catch(() => toast('Выдели код и скопируй вручную'));
 }
-function gdReady() { return !!(SY.gdUrl && SY.gdSecret); }
+function gdReady() { return !!(SY.gdUrl && SY.gdSecret) || !!SY.gSess; }
 async function gdCall(action, data, extra, timeoutMs) {
+  if (gMode()) {
+    try { return await gdLocal(action, data, extra); }
+    catch (e) { if (/Failed to fetch|NetworkError/i.test(e.message || '')) throw new Error('нет связи с Google — проверь интернет'); throw e; }
+  }
   if (!gdReady()) throw new Error('не заполнен адрес или секрет');
   const c = new AbortController(), t = setTimeout(() => c.abort(), timeoutMs || 60000);
   try {
@@ -6364,6 +6373,222 @@ async function gdCall(action, data, extra, timeoutMs) {
     throw e;
   } finally { clearTimeout(t); }
 }
+/* =================== ВХОД ЧЕРЕЗ GOOGLE — данные на Диске пользователя без скрипта ===================
+   Сервер дневника (тот же, что для cTrader) хранит только вход и выдаёт короткий токен доступа.
+   Доступ drive.file: дневник видит только папку и файлы, которые создал сам. Данные идут браузер ↔ Google напрямую. */
+const gMode = () => !!SY.gSess;
+let gTk = null;                          // { access_token, expires }
+async function gToken(force) {
+  if (!force && gTk && gTk.expires > Date.now() + 60000) return gTk.access_token;
+  const j = await ctSrvCall('/g/token', { session: SY.gSess }, 30000).catch(e => {
+    if (e.code === 'NO_GSESS') { SY.gSess = ''; saveSY(); fillGd(); }
+    throw e;
+  });
+  gTk = j;
+  if (j.email && j.email !== SY.gEmail) { SY.gEmail = j.email; saveSY(); }
+  if (j.ct && !CT.conn) { CT.conn = j.ct; CT.connected = true; saveCT(); fillCT(); }   // cTrader, подключённый на другом устройстве
+  return j.access_token;
+}
+const G_API = 'https://www.googleapis.com/drive/v3/', G_UP = 'https://www.googleapis.com/upload/drive/v3/files';
+const G_FOLDER = 'application/vnd.google-apps.folder', G_SHEET = 'application/vnd.google-apps.spreadsheet';
+const G_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+async function gFetch(url, opt, again) {
+  const o = Object.assign({}, opt || {}); o.headers = Object.assign({}, o.headers || {}, { Authorization: 'Bearer ' + await gToken(again) });
+  const r = await fetch(url.indexOf('http') === 0 ? url : G_API + url, o);
+  if (r.status === 401 && !again) return gFetch(url, opt, true);
+  if (!r.ok) {
+    let m = ''; try { const j = await r.json(); m = (j.error && (j.error.message || j.error)) || ''; } catch (e) {}
+    const e = new Error(r.status === 404 ? 'файл не найден или дневнику к нему нет доступа' : 'Google Диск: ' + (m || r.status)); e.status = r.status; throw e;
+  }
+  return r;
+}
+const gJson = async (url, opt) => (await gFetch(url, opt)).json();
+const gq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+async function gList(q, fields) {
+  let out = [], tok = '';
+  do {
+    const j = await gJson('files?pageSize=1000&q=' + encodeURIComponent(q + ' and trashed=false') + '&fields=' + encodeURIComponent('nextPageToken,files(' + (fields || 'id,name,mimeType,size,modifiedTime,parents') + ')') + (tok ? '&pageToken=' + tok : ''));
+    out = out.concat(j.files || []); tok = j.nextPageToken || '';
+  } while (tok);
+  return out;
+}
+const G_DIR = {};
+async function gDir(name, parent) {             // найти или создать папку
+  const key = (parent || 'root') + '/' + name;
+  if (G_DIR[key]) return G_DIR[key];
+  const f = (await gList("mimeType='" + G_FOLDER + "' and name='" + gq(name) + "' and '" + (parent || 'root') + "' in parents", 'id,name'))[0];
+  G_DIR[key] = f ? f.id : (await gJson('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, mimeType: G_FOLDER, parents: [parent || 'root'] }) })).id;
+  return G_DIR[key];
+}
+const gRoot = () => gDir(SY.gdFolder || 'Дневник трейдера');
+async function gUpload(meta, blob, fileId) {     // до 5 МБ — одним запросом, больше — возобновляемой загрузкой
+  const ep = G_UP + (fileId ? '/' + fileId : '') + '?fields=id,name,size,modifiedTime&uploadType=';
+  const method = fileId ? 'PATCH' : 'POST';
+  if (blob.size < 5 * 1024 * 1024) {
+    const b = 'fxj' + Date.now();
+    const body = new Blob(['--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + '\r\n--' + b + '\r\nContent-Type: ' + (blob.type || 'application/octet-stream') + '\r\n\r\n', blob, '\r\n--' + b + '--']);
+    return gJson(ep + 'multipart', { method, headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body });
+  }
+  const r = await gFetch(ep + 'resumable', { method, headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': blob.type || 'application/octet-stream' }, body: JSON.stringify(meta) });
+  const loc = r.headers.get('Location'); if (!loc) throw new Error('Google не выдал адрес загрузки');
+  const up = await fetch(loc, { method: 'PUT', body: blob });
+  if (!up.ok) throw new Error('Google Диск не принял файл (' + up.status + ')');
+  return up.json();
+}
+const gTrash = id => gJson('files/' + id + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+const gB64Blob = (b64, type) => fetch('data:' + (type || 'application/octet-stream') + ';base64,' + b64).then(r => r.blob());
+const gStamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + '-' + p(d.getMinutes()) + '-' + p(d.getSeconds()); };
+async function gBackups() {
+  const root = await gRoot();
+  return (await gList("'" + root + "' in parents and name contains 'trading-journal-'", 'id,name,size,modifiedTime'))
+    .filter(f => f.name.indexOf('trading-journal-') === 0)
+    .map(f => ({ id: f.id, name: f.name, size: +f.size || 0, updated: f.modifiedTime }))
+    .sort((a, b) => a.updated < b.updated ? 1 : -1);
+}
+async function gWalkBt(dir, files, dirs) {
+  const all = await gList("'" + dir + "' in parents");
+  for (const f of all) {
+    if (f.mimeType === G_FOLDER) { dirs.push({ id: f.id, name: f.name, parent: dir }); await gWalkBt(f.id, files, dirs); }
+    else if (f.mimeType === G_SHEET || f.mimeType === G_XLSX) files.push({ id: f.id, name: f.name, folder: dir, xlsx: f.mimeType === G_XLSX, updated: f.modifiedTime, size: +f.size || 0 });
+  }
+}
+const gParent = async id => ((await gJson('files/' + id + '?fields=parents')).parents || [])[0];
+async function gToSheet(name, blob, parent) {
+  return gUpload({ name: String(name).replace(/\.xls[xm]?$/i, ''), mimeType: G_SHEET, parents: [parent] }, new Blob([blob], { type: G_XLSX }));
+}
+/* те же действия, что умел скрипт Google, — с теми же ответами */
+async function gdLocal(action, data, x) {
+  x = x || {};
+  const folderName = SY.gdFolder || 'Дневник трейдера';
+  if (action === 'ping') { const a = await gBackups(); return { ok: true, folder: folderName, count: a.length, updated: a.length ? a[0].updated : null }; }
+  if (action === 'save') {
+    const root = await gRoot(), name = 'trading-journal-' + gStamp() + '.json';
+    await gUpload({ name, parents: [root], mimeType: 'application/json' }, new Blob([data], { type: 'application/json' }));
+    const a = await gBackups(), keep = +SY.gdKeep || 30;
+    for (const f of a.slice(keep)) { try { await gTrash(f.id); } catch (e) {} }
+    return { ok: true, name, size: data.length, folder: folderName, count: Math.min(a.length, keep) };
+  }
+  if (action === 'list') return { ok: true, folder: folderName, files: await gBackups() };
+  if (action === 'load') {
+    let f;
+    if (x.fileId) { const m = await gJson('files/' + x.fileId + '?fields=id,name,modifiedTime'); f = { id: m.id, name: m.name, updated: m.modifiedTime }; }
+    else { f = (await gBackups())[0]; if (!f) throw new Error('В папке «' + folderName + '» копий ещё нет'); }
+    return { ok: true, data: await (await gFetch('files/' + f.id + '?alt=media')).text(), name: f.name, updated: f.updated, folder: folderName };
+  }
+  if (action === 'btlist') { const root = await gDir('Бэктесты', await gRoot()), files = [], folders = []; await gWalkBt(root, files, folders); return { ok: true, root, files, folders }; }
+  if (action === 'btupload') {
+    const to = x.parent || await gDir('Бэктесты', await gRoot());
+    const m = await gToSheet(x.name, await gB64Blob(x.data, G_XLSX), to); return { ok: true, id: m.id, name: m.name };
+  }
+  if (action === 'btconvert') {
+    const m = await gJson('files/' + x.id + '?fields=name,parents');
+    const blob = await (await gFetch('files/' + x.id + '?alt=media')).blob();
+    const c = await gToSheet(m.name, blob, (m.parents || [])[0]); return { ok: true, id: c.id, name: c.name };
+  }
+  if (action === 'btlink') {
+    const to = x.parent || await gDir('Бэктесты', await gRoot());
+    let m; try { m = await gJson('files/' + x.id + '?fields=name'); }
+    catch (e) { throw new Error('дневник видит только свои файлы на Диске. Скачай таблицу как .xlsx (Файл → Скачать → Microsoft Excel) и загрузи её кнопкой «Загрузить .xlsx»'); }
+    const c = await gJson('files/' + x.id + '/copy?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: m.name, parents: [to] }) });
+    return { ok: true, id: c.id, copied: true };
+  }
+  if (action === 'btcopy') {
+    const m = await gJson('files/' + x.id + '?fields=name,parents');
+    const c = await gJson('files/' + x.id + '/copy?fields=id,name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: x.name || ('Копия ' + m.name), parents: m.parents }) });
+    return { ok: true, id: c.id, name: c.name };
+  }
+  if (action === 'btrename') { await gJson('files/' + x.id + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: x.name }) }); return { ok: true }; }
+  if (action === 'bttrash') { await gTrash(x.id); return { ok: true }; }
+  if (action === 'btmkdir') {
+    const p = x.parent || await gDir('Бэктесты', await gRoot());
+    const c = await gJson('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: x.name, mimeType: G_FOLDER, parents: [p] }) });
+    return { ok: true, id: c.id };
+  }
+  if (action === 'btmove') {
+    const old = await gParent(x.id);
+    await gJson('files/' + x.id + '?fields=id&addParents=' + x.parent + (old ? '&removeParents=' + old : ''), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    return { ok: true };
+  }
+  if (/^ct/.test(action)) throw new Error('при входе через Google cTrader подключается кнопкой «Подключить cTrader»');
+  throw new Error('действие ' + action + ' не поддерживается');
+}
+/* база знаний: файлы уходят на Диск как есть, без кусков */
+async function gKbSend(report) {
+  const kb = await gDir('Файлы базы знаний', await gRoot());
+  const have = await gList("'" + kb + "' in parents", 'id,name,size');
+  let sent = 0, failed = [], chunked = 0;
+  for (let i = 0; i < KB.length; i++) {
+    const f = KB[i], name = f.id + '__' + f.name;
+    try {
+      const blob = await idbGet('kb', f.id); if (!blob) continue;
+      const ex = have.find(h => h.name === name);
+      if (ex && +ex.size === blob.size) { sent++; continue; }          // уже на Диске
+      if (report) report('База знаний: файл ' + (i + 1) + ' из ' + KB.length + ' · ' + esc(f.name) + ' (' + fmtSize(f.size) + ')…');
+      if (ex) await gUpload({}, blob, ex.id); else await gUpload({ name, parents: [kb], mimeType: f.type || blob.type || 'application/octet-stream' }, blob);
+      sent++;
+    } catch (e) { failed.push(f.name); }
+  }
+  return { sent, failed, chunked };
+}
+async function gKbFetch(report) {
+  const kb = await gDir('Файлы базы знаний', await gRoot());
+  const have = await gList("'" + kb + "' in parents", 'id,name');
+  let got = 0;
+  for (const meta of KB) {
+    if (await idbGet('kb', meta.id)) continue;
+    const f = have.find(x => x.name.indexOf(meta.id + '__') === 0); if (!f) continue;
+    try {
+      if (report) report('Забираю с Диска: ' + esc(meta.name) + '…');
+      const b = await (await gFetch('files/' + f.id + '?alt=media')).blob();
+      await idbPut('kb', meta.id, b.type ? b : new Blob([b], { type: meta.type || '' })); got++;
+    } catch (e) {}
+  }
+  return got;
+}
+/* вход / выход */
+const PEND_KEY = 'fxj.pend.v1';
+function gRandState() { return Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'[b & 63]).join(''); }
+let gWait = null;
+function gLogin() {
+  const st = gRandState();
+  try { localStorage.setItem(PEND_KEY, JSON.stringify({ kind: 'g', st, at: Date.now() })); } catch (e) {}
+  const w = window.open(CT_SRV + '/g/start?state=' + st, '_blank');
+  if (!w) { location.href = CT_SRV + '/g/start?state=' + st; return; }
+  gdStatus('Открылось окно Google: выбери аккаунт и нажми <b>Продолжить</b>. Галочку доступа к Диску оставь включённой. Дневник подхватит вход сам…');
+  gPoll(st);
+}
+function gPoll(st) {
+  clearInterval(gWait); const t0 = Date.now();
+  gWait = setInterval(async () => {
+    if (Date.now() - t0 > 15 * 60000) { clearInterval(gWait); localStorage.removeItem(PEND_KEY); return; }
+    try {
+      const j = await ctSrvCall('/g/claim', { state: st }, 15000);
+      if (j.session) { clearInterval(gWait); localStorage.removeItem(PEND_KEY); await gAfterLogin(j); }
+    } catch (e) {}
+  }, 2500);
+}
+async function gAfterLogin(j) {
+  SY.gSess = j.session; SY.gEmail = j.email || ''; SY.gdAuto = true; saveSY(); gTk = null;
+  for (const k in G_DIR) delete G_DIR[k];
+  fillGd(); toast('Вход выполнен: ' + (j.email || 'Google'));
+  try { await gToken(true); } catch (e) {}
+  if (CT.conn) ctSrvCall('/g/ctset', { session: SY.gSess, conn: CT.conn }, 15000).catch(() => {});
+  gdStatus('Сверяюсь с Google Диском…');
+  await gdPull(true);
+  gdStatus('<span class="up">Готово.</span> Данные сохраняются на твой Google Диск в папку «' + esc(SY.gdFolder || 'Дневник трейдера') + '».');
+  gsRefresh(true).catch(() => {});
+  if (CT.auto !== false && Object.keys(CT.links || {}).length && ctReady()) ctSync(true);
+}
+async function gLogout() {
+  if (!confirm('Выйти из Google на этом устройстве? Данные дневника на устройстве и на Диске останутся.')) return;
+  const s = SY.gSess; SY.gSess = ''; SY.gdAuto = false; saveSY(); gTk = null;
+  try { await ctSrvCall('/g/logout', { session: s }, 15000); } catch (e) {}
+  fillGd(); gdStatus('Вы вышли из Google на этом устройстве.');
+}
+setTimeout(function gResume() {           // вход шёл в этой же вкладке — продолжаем ждать после возврата
+  try { const p = JSON.parse(localStorage.getItem(PEND_KEY) || 'null'); if (p && p.kind === 'g' && Date.now() - p.at < 15 * 60000 && !SY.gSess) gPoll(p.st); } catch (e) {}
+}, 600);
+
 function gdStatus(html) { const n = $('#gdStatus'); if (n) n.innerHTML = html; }
 async function gdTest() {
   gdRead();
@@ -6381,6 +6606,8 @@ async function gdTest() {
   } catch (e) { gdErr(e); }
 }
 function gdErr(e) {
+  if (gMode()) return gdStatus('<span class="dn">Не получилось: ' + esc(String(e.message || e)) + '</span>' +
+    (/устарел|NO_GSESS/i.test(String(e.message || e)) ? '<br><span class="mut">Нажми «Войти через Google» ещё раз.</span>' : '<br><span class="mut">Проверь интернет и попробуй ещё раз.</span>'));
   gdStatus('<span class="dn">Не получилось: ' + esc(String(e.message || e)) + '</span>' +
     '<br><span class="mut">Пройди по списку:</span>' +
     '<br><span class="mut">1. В скрипте семнадцать функций, последние — doGet и out.</span>' +
@@ -6402,6 +6629,7 @@ function blobToB64(blob) {
   return new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(',')[1] || ''); fr.readAsDataURL(blob); });
 }
 async function gdSendKb(report) {
+  if (gMode()) return gKbSend(report);
   const list = KB.slice();
   let sent = 0, failed = [], chunked = 0;
   for (let i = 0; i < list.length; i++) {
@@ -6431,6 +6659,7 @@ async function gdSendKb(report) {
   return { sent, failed, chunked };
 }
 async function gdFetchKb(report) {
+  if (gMode()) return gKbFetch(report);
   const j = await gdCall('kblist');
   const onDrive = j.files || [];
   let got = 0;
@@ -6578,6 +6807,11 @@ function bkInfo() {
 }
 function fillGd() {
   if (!$('#gdUrl')) return;
+  const gb = $('#gBox');
+  if (gb) gb.innerHTML = gMode()
+    ? '<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><span class="up"><b>✓ Вход через Google</b></span><span class="mut" style="font-size:12.5px">' + esc(SY.gEmail || '') + '</span><button class="btn sm" onclick="gLogout()">Выйти</button></div>'
+    : '<button class="btn pri" onclick="gLogin()">Войти через Google</button><div class="mut" style="font-size:11.5px;margin-top:6px;line-height:1.5">Данные будут храниться в папке «Дневник трейдера» на твоём Google Диске. Дневник видит только свои файлы — остальной Диск ему недоступен.</div>';
+  if ($('#gdOld')) $('#gdOld').style.display = gMode() ? 'none' : '';
   $('#gdUrl').value = SY.gdUrl || '';
   $('#gdSecret').value = SY.gdSecret || '';
   $('#gdFolder').value = SY.gdFolder || 'Дневник трейдера';
@@ -6590,20 +6824,20 @@ function fillGd() {
   if ($('#bkKb')) $('#bkKb').onchange = sync('bkKb');
   $('#gdAuto').onchange = () => { gdRead(); if (SY.gdAuto) { gdStatus('Сверяюсь с Диском…'); gdPull(true).then(() => gdStatus('<span class="up">Автосинхронизация включена</span>')); } };
   if (SY.gdLast) gdStatus('<span class="mut">Последняя отправка на Диск: ' + dt(new Date(SY.gdLast).toISOString()) + '</span>');
-  else if (gdReady()) gdStatus('<span class="mut">Адрес сохранён. Нажми «Проверить связь».</span>');
+  else if (gdReady() && !gMode()) gdStatus('<span class="mut">Адрес сохранён. Нажми «Проверить связь».</span>');
   bkInfo();
 }
 
 /* ---------- настройки синхронизации ---------- */
 const LS_SY = 'fxj.sync.v1';
-let SY = { gdUrl: '', gdSecret: '', gdFolder: 'Дневник трейдера', gdKeep: 30, gdAuto: false, gdLast: 0 };
+let SY = { gSess: '', gEmail: '', gdUrl: '', gdSecret: '', gdFolder: 'Дневник трейдера', gdKeep: 30, gdAuto: false, gdLast: 0 };
 try { Object.assign(SY, JSON.parse(localStorage.getItem(LS_SY)) || {}); } catch (e) {}
 function saveSY() { localStorage.setItem(LS_SY, JSON.stringify(SY)); }
 let syTimer = null, syApplying = false, gdBusy = false, gdPullAt = 0;
 markDirty = function () {
   if (syApplying) return;                 // данные пришли с Диска — обратно не отправляем
   SY.localMod = Date.now(); saveSY();
-  if (!SY.gdAuto || !SY.gdUrl) return;
+  if (!SY.gdAuto || !gdReady()) return;
   clearTimeout(syTimer);
   syTimer = setTimeout(() => gdSave(true), 8000);
 };
@@ -6857,7 +7091,7 @@ function hvDraw(t, res) {
 }
 async function hvShow(id, ev) {
   const t = TR.find(x => x.id === id), ctid = ctCtidFor(S.id);
-  if (!t || !ctid || !gdReady() || hvId !== id) return;
+  if (!t || !ctid || !ctReady() || hvId !== id) return;
   const b = hvBox(), g = tradeTag(t);
   $('#hvH').innerHTML = '<b>' + esc(t.symbol) + '</b> · <span class="' + (t.side === 'buy' ? 'up' : 'dn') + '">' + (t.side === 'buy' ? 'BUY' : 'SELL') + '</span>' +
     (t.volume != null ? ' ' + nf(t.volume) + ' лот' : '') + (g ? ' · <span class="xr ' + g[0] + '">' + g[1] + '</span>' : '') +
@@ -7063,7 +7297,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 }
 /* хранилище браузера не должно чиститься само */
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-setTimeout(() => (gdReady() ? Promise.resolve(gdPull(true)).catch(() => {}) : Promise.resolve()).then(() => { if (CT.auto !== false && Object.keys(CT.links || {}).length && ctReady()) ctSync(true); }), 1200);
+setTimeout(() => (gMode() ? gToken().catch(() => {}) : Promise.resolve()).then(() => gdReady() ? Promise.resolve(gdPull(true)).catch(() => {}) : 0).then(() => { if (CT.auto !== false && Object.keys(CT.links || {}).length && ctReady()) ctSync(true); }), 1200);
 </script>
 </body>
 </html>
