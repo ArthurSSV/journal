@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Дневник трейдера — Политика конфиденциальности</title>
+<style>
+  body{margin:0;background:#0d1117;color:#e6edf3;font:16px/1.65 -apple-system,Segoe UI,Arial,sans-serif}
+  main{max-width:760px;margin:0 auto;padding:40px 22px 60px}
+  h1{font-size:26px;margin:0 0 4px} h2{font-size:18px;margin:28px 0 8px;color:#e3b341}
+  .mut{color:#8b98a8;font-size:14px} a{color:#58a6ff} li{margin:4px 0}
+  hr{border:0;border-top:1px solid #30363d;margin:36px 0}
+</style>
+</head>
+<body><main>
+<h1>Политика конфиденциальности</h1>
+<div class="mut">Дневник трейдера · https://arthurssv.github.io/journal/ · обновлено 19.11.2026</div>
+
+<h2>Что это за приложение</h2>
+<p>«Дневник трейдера» — веб-приложение для ведения журнала сделок. Оно работает в браузере пользователя; все записи хранятся на его устройстве и в его собственном Google Диске.</p>
+
+<h2>Доступ к Google</h2>
+<ul>
+  <li><b>Google Диск (drive.file)</b> — приложение создаёт в Диске пользователя папку «Дневник трейдера» и работает только с файлами, которые создало само или которые пользователь явно выбрал. Остальные файлы Диска приложению недоступны.</li>
+  <li><b>Адрес почты (email, openid)</b> — чтобы показать, под каким аккаунтом выполнен вход, и привязать к нему подключения.</li>
+</ul>
+<p>Данные дневника передаются напрямую между браузером пользователя и Google Диском. Разработчик их не получает, не просматривает и не хранит.</p>
+
+<h2>Что хранится на сервере</h2>
+<p>Сервер приложения (Cloudflare Workers) хранит только технические ключи доступа (токены Google и cTrader), чтобы вход не требовался заново на каждом устройстве. Токены не передаются третьим лицам и удаляются при выходе из аккаунта в приложении или через 13 месяцев без использования.</p>
+
+<h2>cTrader</h2>
+<p>При подключении cTrader приложение получает доступ <b>только на чтение</b> (история сделок, ордера, котировки). Открывать или закрывать сделки приложение не может.</p>
+
+<h2>Передача данных</h2>
+<p>Данные пользователей не продаются, не используются для рекламы и не передаются третьим лицам. Использование данных, полученных через API Google, соответствует <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, включая требования Limited Use.</p>
+
+<h2>Как отозвать доступ</h2>
+<p>В любой момент: кнопка «Выйти» в приложении, либо <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> (Google) и cTrader ID → Settings → Open API (cTrader). Данные на вашем Google Диске остаются вашими — их можно удалить вручную.</p>
+
+<h2>Контакты</h2>
+<p>Вопросы по конфиденциальности: через адрес поддержки, указанный на экране входа Google.</p>
+
+<hr>
+<h1 style="font-size:20px">Privacy Policy (English)</h1>
+<p>Trader's Journal is a browser app for keeping a trading journal. Data is stored on the user's device and in the user's own Google Drive.</p>
+<ul>
+  <li><b>Google Drive (drive.file)</b>: the app only accesses files it created (folder “Дневник трейдера”) or files the user explicitly selected.</li>
+  <li><b>Email (openid, email)</b>: used to identify the signed-in account.</li>
+</ul>
+<p>Journal data goes directly between the user's browser and Google Drive; the developer does not receive or store it. The app server (Cloudflare Workers) stores only access tokens so users stay signed in; tokens are deleted on sign-out or after 13 months of inactivity. cTrader access is read-only. Data is never sold, used for ads, or shared with third parties. Use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. Revoke access any time at myaccount.google.com/permissions.</p>
+</main></body>
+</html>
