@@ -111,7 +111,7 @@ tbody tr{cursor:pointer}
 /* дашборд: слева золото и кривая, справа календарь */
 .dashtop{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:12px;align-items:stretch}
 @media(max-width:1250px){.dashtop{grid-template-columns:1fr}}
-.calbox{display:flex;flex-direction:column;min-height:420px}
+.calbox{display:flex;flex-direction:column;min-height:420px;container-type:inline-size}
 .segm{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .segm button{padding:4px 10px;font-size:11.5px;color:var(--tx2);background:var(--bg)}
 .segm button.on{background:var(--bg3);color:var(--tx)}
@@ -125,14 +125,26 @@ tbody tr{cursor:pointer}
 .calsum div span{font-size:10.5px;color:var(--tx3)}
 .calgrid{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(58px,1fr);gap:2px;margin-top:4px}
 .calgrid .cdow{font-size:10.5px;color:var(--tx3);text-align:center;padding:4px 0;grid-row:auto;min-height:0;text-transform:lowercase}
-.cday{background:var(--bg3);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 0 0;min-width:0;overflow:hidden;position:relative}
+.cday{container-type:inline-size;background:var(--bg3);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 0 0;min-width:0;overflow:hidden;position:relative}
 .cday.out{opacity:.45}
 .cday.today{box-shadow:inset 0 0 0 1px var(--acc)}
 .cday .cn{font-size:12px;color:var(--tx2);line-height:20px;min-width:24px;text-align:center}
 .cday.w .cn,.cday.l .cn{border-radius:5px;padding:0 5px;font-weight:600}
 .cday.w .cn{color:#9be7bd;border:1px solid var(--up)}
 .cday.l .cn{color:#f3a3ab;border:1px solid var(--dn)}
-.cday .cv{width:100%;text-align:center;font-size:11.5px;font-weight:600;padding:7px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.cday .cv{width:100%;text-align:center;font-weight:600;padding:4px 2px 5px;line-height:1.15;overflow:hidden;font-variant-numeric:tabular-nums}
+.cv .a{display:block;font-size:clamp(10.5px,17cqw,13.5px);white-space:nowrap}
+.cv .n{display:block;font-size:10px;font-weight:500;opacity:.85;white-space:nowrap}
+.cv .f1,.cv .f2,.cv .f3,.cv .k1,.cv .k2,.calsum .lg,.calsum .sh{display:none}
+@container (min-width:66px){.cv .f1{display:inline}}
+@container (min-width:46px) and (max-width:65.98px){.cv .f2{display:inline}}
+@container (max-width:45.98px){.cv .f3{display:inline}}
+@container (min-width:84px){.cv .k1{display:inline}}
+@container (max-width:83.98px){.cv .k2{display:inline}}
+@container (min-width:600px){.calsum .lg{display:inline}}
+@container (max-width:599.98px){.calsum .sh{display:inline}}
+@container (max-width:520px){.calhead{grid-template-columns:1fr}.calnav{justify-content:center}.calsum{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@supports not (container-type:inline-size){.cv .f2,.cv .k2,.calsum .lg{display:inline}}
 .cday.w .cv{background:#1f6b3f;color:#e8fff1}
 .cday.l .cv{background:#6b2630;color:#ffe9ec}
 .cday.z .cv{background:#3a4452}
@@ -143,7 +155,6 @@ tbody tr{cursor:pointer}
   .calnav{justify-content:center}
   .calsum{grid-template-columns:repeat(2,1fr)}
   .calgrid{grid-auto-rows:minmax(50px,1fr)}
-  .cday .cv{font-size:9.5px;padding:5px 1px}
   .cday .cn{font-size:11px}
   .calbox{min-height:0}
 }
@@ -1705,6 +1716,9 @@ function calShift(k) {
   renderCal();
 }
 function calNum(v) { return nf(v, Math.abs(v) >= 100 ? 0 : 2); }
+function calInt(v) { const r = Math.round(v); return nf(r === 0 ? 0 : r, 0); }                        // клетки календаря — целые, без копеек
+function calShort(v) { return Math.abs(v) >= 1000 ? nf(Math.round(v / 100) / 10, 1) + 'k' : calInt(v); }
+function calDeals(n) { return n + ' ' + plural(n, ['сделка', 'сделки', 'сделок']); }
 let CALDAYS = {};
 function renderCal() {
   if (!$('#calGrid')) return;
@@ -1731,7 +1745,8 @@ function renderCal() {
     h += '<div class="cday' + c + (d.getUTCMonth() !== calM ? ' out' : '') + (k === todayK ? ' today' : '') + '" data-k="' + k + '"' +
       (list.length ? ' onclick="calOpen(\'' + k + '\')"' : '') + '>' +
       '<span class="cn">' + d.getUTCDate() + '</span>' +
-      (list.length ? '<div class="cv">' + calNum(net) + ' ' + cur + ' (' + list.length + ')</div>' : '<div></div>') + '</div>';
+      (list.length ? '<div class="cv"><span class="a"><span class="f1">' + calInt(net) + ' ' + cur + '</span><span class="f2">' + calInt(net) + '</span><span class="f3">' + calShort(net) + '</span></span>' +
+        '<span class="n"><span class="k1">' + calDeals(list.length) + '</span><span class="k2">×' + list.length + '</span></span></div>' : '<div></div>') + '</div>';
   }
   const g = $('#calGrid');
   g.innerHTML = h;
@@ -1750,7 +1765,7 @@ function renderCal() {
     '<div><b class="up">' + calNum(inc) + ' ' + cur + '</b><span>Доход</span></div>' +
     '<div><b class="dn">' + calNum(loss) + ' ' + cur + '</b><span>Убыток</span></div>' +
     '<div><b class="' + cls(net) + '">' + calNum(net) + ' ' + cur + '</b><span>Чистая прибыль</span></div>' +
-    '<div><b class="' + cls(net) + '">' + (days ? calNum(net / days) + ' ' + cur : '—') + '</b><span>Средн. за торговый день</span></div>';
+    '<div><b class="' + cls(net) + '">' + (days ? calNum(net / days) + ' ' + cur : '—') + '</b><span><span class="lg">Средн. за торговый день</span><span class="sh">Ср. за день</span></span></div>';
   $$('#calMode button').forEach(b => b.classList.toggle('on', (b.dataset.m === 'all') === calAll));
 }
 function calTip(k) {
