@@ -7485,9 +7485,10 @@ function dscApply() {
 function dscLocked() { return dscActive() && DSC_ST.code !== 'ok' && DSC_ST.code !== 'off'; }
 function dscGate() {
   const g = $('#dscGate'); if (!g) return;
-  const lock = dscLocked() && (currentPage === 'dash' || currentPage === 'trades');
+  const LOCKED = ['dash', 'trades', 'stats', 'journal', 'circ'];          // закрытые разделы, пока нет допуска
+  const lock = dscLocked() && LOCKED.includes(currentPage);
   g.style.display = lock ? '' : 'none';
-  $$('#p-dash,#p-trades').forEach(s => s.classList.toggle('dsclock', lock));
+  LOCKED.forEach(p => { const sec = $('#p-' + p); if (sec) sec.classList.toggle('dsclock', lock && currentPage === p); });
   if (lock) g.innerHTML = '<div class="dscgate ' + (['morning', 'evening', 'pause'].includes(DSC_ST.code) ? 'wait' : 'bad') + '"><div class="big">' + (['stop', 'final', 'deny'].includes(DSC_ST.code) ? '■' : '✕') + '</div><h2>' +
     ({ morning: 'Допуска нет', evening: 'Допуска нет', pause: 'Пауза', stop: 'Стоп на сегодня', final: 'Стоп до завтра', deny: 'Торговля запрещена' }[DSC_ST.code] || 'Допуска нет') + '</h2><p>' + esc(DSC_ST.text) + '</p>' +
     '<button class="btn pri" onclick="go(\'disc\')">' + (DSC_ST.code === 'evening' ? 'Сделать разбор дня' : DSC_ST.code === 'morning' ? 'Заполнить чек-лист' : DSC_ST.code === 'stop' ? 'Повторный допуск' : 'Открыть «Допуск дня»') + '</button></div>';
@@ -7567,7 +7568,7 @@ function renderDisc() {
   const r = dscEval(), cfg = dscCfg(), today = dscToday(), d = dscDay(today), team = dscTeam();
   let h = '';
   if (!dscActive()) {
-    h += '<div class="card" style="margin-bottom:14px"><h2>Режим допуска выключен</h2><p class="mut" style="font-size:12.5px;line-height:1.6;margin:6px 0 12px">Утром — чек-лист и план дня, вечером — разбор. Пока не заполнено, дашборд и сделки закрыты. ' +
+    h += '<div class="card" style="margin-bottom:14px"><h2>Режим допуска выключен</h2><p class="mut" style="font-size:12.5px;line-height:1.6;margin:6px 0 12px">Утром — чек-лист и план дня, вечером — разбор. Пока не заполнено, дашборд, сделки, аналитика, журнал и дневник кружков закрыты. ' +
       'При просадке дня до лимита счёта (Настройки → Активный счёт → лимит дня, по умолчанию 2%) — стоп; вернуться можно после чек-листа повторного допуска и паузы.</p>' +
       '<button class="btn pri" onclick="dscEnable(true)">Включить для себя</button></div>';
   } else {
