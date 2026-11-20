@@ -159,6 +159,28 @@ tbody tr{cursor:pointer}
   .calbox{min-height:0}
 }
 canvas{display:block;width:100%}
+.dscpill{margin:10px 12px 0;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line);font-size:11.5px;line-height:1.35}
+.dscpill b{display:block;font-size:13px}.dscpill span{color:var(--tx2);display:block}
+.dscpill.ok{background:var(--up-bg);border-color:transparent}.dscpill.ok b{color:var(--up)}
+.dscpill.wait{background:rgba(224,168,82,.13);border-color:transparent}.dscpill.wait b{color:var(--warn)}
+.dscpill.bad{background:var(--dn-bg);border-color:transparent}.dscpill.bad b{color:var(--dn)}
+.page.dsclock{display:none!important}
+.dscgate{border-radius:var(--r);padding:22px;text-align:center;border:1px solid var(--line);background:var(--bg2)}
+.dscgate .big{font-size:40px;line-height:1}.dscgate h2{margin:8px 0 4px}.dscgate p{color:var(--tx2);font-size:13px;margin-bottom:12px}
+.dscgate.bad{background:var(--dn-bg);border-color:rgba(224,82,96,.35)}.dscgate.bad h2,.dscgate.bad .big{color:var(--dn)}
+.dscgate.wait{background:rgba(224,168,82,.10);border-color:rgba(224,168,82,.35)}.dscgate.wait h2,.dscgate.wait .big{color:var(--warn)}
+.dscgate.ok{background:var(--up-bg);border-color:transparent;padding:14px}.dscgate.ok h2{color:var(--up)}.dscgate.ok p{margin:0}
+#dscGate .dscgate{padding:48px 22px;margin-top:10vh}
+.dscform .chk{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:13px}.dscform .chk input{width:auto}
+.dscaccs{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.dscacc{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--bg3);border-radius:8px;padding:10px 12px}
+.dscre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin:-2px 0 6px}
+.warn{color:var(--warn)}
+.teamcode{font-size:20px;letter-spacing:3px;background:var(--bg3);padding:4px 12px;border-radius:8px;font-family:ui-monospace,Menlo,monospace}
+.teamgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
+.teamgrid>div{background:var(--bg3);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;font-size:12px}
+.teamgrid b{font-size:15px}
+.teamre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px}
 .bars .b{margin-bottom:9px}
 .bars .lb{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
 .bars .tr{height:6px;background:var(--bg3);border-radius:4px;overflow:hidden;display:flex}
@@ -556,12 +578,14 @@ canvas{cursor:crosshair}
       </div>
       <div class="mut" id="accInfo" style="font-size:11px;margin-top:6px"></div>
     </div>
+    <div id="dscPill" class="dscpill" style="display:none" onclick="go('disc')" title="Допуск дня"></div>
     <div class="live" id="liveBox" onclick="go('settings')" title="Настройки котировок">
       <div class="row" style="justify-content:space-between"><span class="lsym">XAU/USD</span><span class="ldot" id="liveDot"></span></div>
       <div class="lprice" id="livePrice">—</div>
       <div class="mut" id="liveChg" style="font-size:11px">нажми, чтобы включить котировки</div>
     </div>
     <nav class="nav" id="nav">
+      <button data-p="disc"><span class="ic">✓</span>Допуск дня</button>
       <button data-p="dash" class="on"><span class="ic">◧</span>Дашборд</button>
       <button data-p="trades"><span class="ic">≡</span>Сделки</button>
       <button data-p="stats"><span class="ic">◨</span>Аналитика</button>
@@ -570,12 +594,24 @@ canvas{cursor:crosshair}
       <button data-p="bt"><span class="ic">⟲</span>Бэктесты</button>
       <button data-p="kb"><span class="ic">▤</span>База знаний</button>
       <button data-p="import"><span class="ic">↧</span>Импорт cTrader</button>
+      <button data-p="team" id="navTeam" style="display:none"><span class="ic">♟</span>Команда</button>
       <button data-p="settings"><span class="ic">⚙</span>Настройки</button>
     </nav>
     <div class="sidefoot" id="sideFoot">Данные хранятся локально<br>на этом устройстве.</div>
   </aside>
 
   <main class="main">
+    <div id="dscGate" style="display:none"></div>
+    <!-- ======== ДОПУСК ДНЯ ======== -->
+    <section class="page" id="p-disc">
+      <h1>Допуск дня</h1><div class="sub">Утренний чек-лист, разбор дня, лимит просадки по счетам и повторный допуск</div>
+      <div id="discBody"></div>
+    </section>
+    <!-- ======== КОМАНДА (наставник) ======== -->
+    <section class="page" id="p-team">
+      <h1>Команда</h1><div class="sub">Статусы допуска трейдеров, решения наставника и правила команды</div>
+      <div id="teamBody"></div>
+    </section>
     <!-- ======== DASH ======== -->
     <section class="page on" id="p-dash">
       <div class="row" style="justify-content:space-between;margin-bottom:16px">
@@ -5192,7 +5228,7 @@ async function ctSync(quiet) {
       (/CH_ACCESS_TOKEN_INVALID|ACCESS_TOKEN|не подключён|не найдено|NO_CONN|refresh/i.test(m) ? '<br><span class="mut">Нажми «Подключить cTrader» и выдай доступ заново.</span>' : '') +
       (!ctSrvMode() && /CH_CLIENT_AUTH_FAILURE|client/i.test(m) ? '<br><span class="mut">Проверь Client ID и Secret (шаг 1).</span>' : ''));
     if (!quiet) toast('cTrader: ' + m);
-  } finally { if (c) c.close(); ctBusy = false; $$('.ctSyncBtn').forEach(b => b.disabled = false); fillCT(); }
+  } finally { if (c) c.close(); ctBusy = false; $$('.ctSyncBtn').forEach(b => b.disabled = false); fillCT(); if (window.DSC_READY) dscApply(); }
 }
 
 /* SL, TP и причина закрытия: история сделок их не содержит — берём из ордеров позиции */
@@ -6074,7 +6110,7 @@ async function buildBackup(withKb) {
     if (d.markup) for (const t of TFS) for (const s of ((d.markup[t[0]] || {}).shots || [])) { const x = await getShot(s); if (x) shots[s] = x; }
     if (d.trades) for (const t of d.trades) for (const s of (t.shots || [])) { const x = await getShot(s); if (x) shots[s] = x; }
   }
-  const out = { v: 3, saved: Date.now(), accounts: ACC, trades, journal: JR, quotes: QS, reviews: RV, profile: PROF, kbList: KB, kbFolders: KBF, circles: CIRC, ct: { conn: CT.conn, links: CT.links, last: CT.last, tz: CT.tz, auto: CT.auto, from: CT.from, accounts: CT.accounts, clientId: CT.clientId }, shots };
+  const out = { v: 3, saved: Date.now(), accounts: ACC, trades, journal: JR, quotes: QS, reviews: RV, profile: PROF, kbList: KB, kbFolders: KBF, circles: CIRC, ct: { conn: CT.conn, links: CT.links, last: CT.last, tz: CT.tz, auto: CT.auto, from: CT.from, accounts: CT.accounts, clientId: CT.clientId }, disc: (typeof DSC !== 'undefined') ? { on: DSC.on, since: DSC.since, days: DSC.days, cfg: DSC.cfg } : undefined, shots };
   if (withKb) {
     out.kbFiles = {};
     for (const f of KB) {
@@ -6095,6 +6131,7 @@ async function applyBackup(d) {
     if (d.profile) { PROF = d.profile; localStorage.setItem(LS_P, JSON.stringify(PROF)); }
     if (d.kbList) { KB = d.kbList; KBF = d.kbFolders || []; saveKB(); }
     if (d.circles) { CIRC = d.circles; saveCirc(); }
+    if (d.disc && window.DSC_READY) { Object.assign(DSC, d.disc); saveDSC(); }
     if (d.ct) { const keep = CT.conn; Object.assign(CT, d.ct); if (!CT.conn && keep && !('conn' in d.ct)) CT.conn = keep; saveCT(); }
     if (d.kbFiles) {
       for (const id in d.kbFiles) {
@@ -7078,6 +7115,7 @@ function go(p) {
   if (p === 'circ') renderCirc();
   if (p === 'kb') renderKB();
   if (p === 'journal') { renderJournal(); jView('help'); }   // вход в раздел всегда начинается с инструкции
+  if (window.DSC_READY) { if (p === 'disc') { renderDisc(); dscPull(); } if (p === 'team') { renderTeam(false); renderTeam(); } dscGate(); }
 }
 function refreshSelects() {
   const syms = [...new Set(TR.map(t => t.symbol))].sort();
@@ -7090,6 +7128,7 @@ function renderAll() {
   const st = accStats(S);
   $('#accInfo').innerHTML = nTrades(st.n) + ' · <span class="' + cls(st.net) + '">' + nf(st.eq) + ' ' + S.currency + '</span>';
   renderDash(); renderTrades(); renderStats(); renderJournal(); renderCirc(); fillSettings();
+  if (window.DSC_READY) dscApply();
 }
 
 $('#nav').onclick = e => { const b = e.target.closest('button'); if (b) go(b.dataset.p); };
@@ -7366,6 +7405,299 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 }
 /* хранилище браузера не должно чиститься само */
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+/* =================== ДОПУСК К ТОРГОВЛЕ: чек-листы, лимит просадки, повторный допуск, команда =================== */
+const LS_DSC = 'fxj.disc.v1';
+const DSC_DEF = {
+  morning: ['Выспался, состояние ровное', 'Проверил новости и экономический календарь', 'Разметил уровни D1 → H4 → H1', 'Знаю риск на сделку и лимит дня', 'План на день:'],
+  evening: ['Все сделки внесены и размечены', 'Сравнил сделки с планом дня', 'Главная ошибка дня:', 'Что сделал хорошо:', 'План на завтра:'],
+  reentry: ['Почему возвращаюсь к торговле:', 'Что изменилось с момента стопа:', 'Риск на следующую сделку:', 'Эмоции сейчас, честно:'],
+  pause: 60, reMax: 1, reExtra: 1
+};
+let DSC = { on: false, since: '', days: {}, me: null, meAt: 0, cfg: null, pushed: {} };
+try { Object.assign(DSC, JSON.parse(localStorage.getItem(LS_DSC)) || {}); } catch (e) {}
+function saveDSC() { localStorage.setItem(LS_DSC, JSON.stringify(DSC)); }
+const dscSrv = () => typeof gMode === 'function' && gMode();
+const dscTeam = () => DSC.me && DSC.me.team && !(DSC.me.own && DSC.me.own.id === DSC.me.team.id) ? DSC.me.team : null;   // команда, где я трейдер
+const dscActive = () => !!dscTeam() || !!DSC.on;
+const dscCfg = () => Object.assign({}, DSC_DEF, dscTeam() ? dscTeam().cfg : (DSC.cfg || {}));
+function dscToday() { const n = new Date(); return n.getFullYear() + '-' + P2(n.getMonth() + 1) + '-' + P2(n.getDate()); }
+function dscDay(d) { DSC.days[d] = DSC.days[d] || {}; return DSC.days[d]; }
+async function dscCall(path, body) { return ctSrvCall(path, Object.assign({ session: SY.gSess }, body || {}), 30000); }
+/* последний торговый день до сегодняшнего (по всем счетам) */
+function dscLastTradeDay(today) {
+  let best = '';
+  ACC.accounts.forEach(a => accTrades(a.id).forEach(t => { const k = dOnly(t.closeTime || t.openTime); if (k < today && k > best && k !== 'NaN-NaN-NaN') best = k; }));
+  return best;
+}
+/* просадка дня по счёту: от баланса на начало дня, по закрытым сделкам */
+function dscAccDay(a, today) {
+  let before = 0, net = 0, n = 0;
+  accTrades(a.id).forEach(t => { const k = dOnly(t.closeTime || t.openTime), v = +t.net || 0; if (k < today) before += v; else if (k === today) { net += v; n++; } });
+  const start = (+a.balance || 0) + before;
+  return { start, net, n, pct: start > 0 ? net / start * 100 : 0, lim: +a.ddLimit > 0 ? +a.ddLimit : 2 };
+}
+function dscEval() {
+  const today = dscToday(), cfg = dscCfg(), day = dscDay(today), now = Date.now();
+  const res = { code: 'ok', text: 'Допуск есть', accs: [], today };
+  if (!dscActive()) { res.code = 'off'; res.text = 'Режим допуска выключен'; return res; }
+  ACC.accounts.forEach(a => {
+    const x = dscAccDay(a, today), re = (day.re || []).filter(r => r.acc === a.id), k = re.length;
+    const thr = x.lim + (+cfg.reExtra || 1) * k, last = re[re.length - 1];
+    let st = 'ok';
+    if (x.pct <= -thr + 1e-9) st = k < (+cfg.reMax || 0) ? 'stop' : 'final';
+    else if (last && last.until > now) st = 'pause';
+    res.accs.push(Object.assign({ id: a.id, name: a.name, k, thr, st, until: last ? last.until : 0 }, x));
+  });
+  const ev = dscLastTradeDay(today), evNeed = ev && (!DSC.since || ev >= DSC.since) && !(DSC.days[ev] || {}).evening;
+  const ov = day.ov && day.ov.v;
+  const worst = ['final', 'stop', 'pause'].map(s => res.accs.find(a => a.st === s)).find(Boolean);
+  if (ov === 'deny') { res.code = 'deny'; res.text = 'Наставник запретил торговлю сегодня' + (day.ov.reason ? ': ' + day.ov.reason : ''); }
+  else if (ov === 'allow') { res.code = 'ok'; res.text = 'Допуск выдан наставником' + (day.ov.reason ? ': ' + day.ov.reason : ''); }
+  else if (evNeed) { res.code = 'evening'; res.text = 'Нет допуска: не сделан разбор дня ' + dFull(ev + 'T00:00:00Z'); }
+  else if (!day.morning) { res.code = 'morning'; res.text = 'Нет допуска: не заполнен утренний чек-лист'; }
+  else if (worst && worst.st === 'final') { res.code = 'final'; res.text = 'Стоп до завтра: «' + worst.name + '» ' + nf(worst.pct, 2) + '%'; }
+  else if (worst && worst.st === 'stop') { res.code = 'stop'; res.text = 'Стоп: «' + worst.name + '» ' + nf(worst.pct, 2) + '% (лимит ' + nf(worst.thr, 1) + '%)'; }
+  else if (worst && worst.st === 'pause') { res.code = 'pause'; res.text = 'Пауза после стопа до ' + new Date(worst.until).toTimeString().slice(0, 5); }
+  if (evNeed) res.evDate = ev;
+  return res;
+}
+let DSC_ST = { code: 'off', accs: [] }, dscPrevStops = null;
+function dscApply() {
+  const r = dscEval(); DSC_ST = r;
+  // новые стопы — уведомление и запись в события дня
+  const stops = r.accs.filter(a => a.st === 'stop' || a.st === 'final').map(a => a.id + ':' + a.st).join(',');
+  if (dscPrevStops !== null && stops && stops !== dscPrevStops && dscActive()) {
+    const a = r.accs.find(x => (x.st === 'stop' || x.st === 'final') && dscPrevStops.indexOf(x.id + ':' + x.st) < 0);
+    if (a) { dscNotify('Стоп на сегодня', '«' + a.name + '»: ' + nf(a.pct, 2) + '% при лимите ' + nf(a.thr, 1) + '%'); dscLog('Стоп: «' + a.name + '» ' + nf(a.pct, 2) + '%'); }
+  }
+  dscPrevStops = stops;
+  const pill = $('#dscPill');
+  if (pill) {
+    pill.style.display = dscActive() ? '' : 'none';
+    pill.className = 'dscpill ' + (r.code === 'ok' ? 'ok' : ['morning', 'evening', 'pause'].includes(r.code) ? 'wait' : 'bad');
+    pill.innerHTML = '<b>' + (r.code === 'ok' ? '✓ Допуск' : ['stop', 'final', 'deny'].includes(r.code) ? '■ Стоп' : r.code === 'pause' ? '◔ Пауза' : '✕ Нет допуска') + '</b><span>' + esc(r.text) + '</span>';
+  }
+  dscGate();
+  if (currentPage === 'disc') renderDisc();
+  dscPushStatus(r);
+  return r;
+}
+function dscLocked() { return dscActive() && DSC_ST.code !== 'ok' && DSC_ST.code !== 'off'; }
+function dscGate() {
+  const g = $('#dscGate'); if (!g) return;
+  const lock = dscLocked() && (currentPage === 'dash' || currentPage === 'trades');
+  g.style.display = lock ? '' : 'none';
+  $$('#p-dash,#p-trades').forEach(s => s.classList.toggle('dsclock', lock));
+  if (lock) g.innerHTML = '<div class="dscgate ' + (['morning', 'evening', 'pause'].includes(DSC_ST.code) ? 'wait' : 'bad') + '"><div class="big">' + (['stop', 'final', 'deny'].includes(DSC_ST.code) ? '■' : '✕') + '</div><h2>' +
+    ({ morning: 'Допуска нет', evening: 'Допуска нет', pause: 'Пауза', stop: 'Стоп на сегодня', final: 'Стоп до завтра', deny: 'Торговля запрещена' }[DSC_ST.code] || 'Допуска нет') + '</h2><p>' + esc(DSC_ST.text) + '</p>' +
+    '<button class="btn pri" onclick="go(\'disc\')">' + (DSC_ST.code === 'evening' ? 'Сделать разбор дня' : DSC_ST.code === 'morning' ? 'Заполнить чек-лист' : DSC_ST.code === 'stop' ? 'Повторный допуск' : 'Открыть «Допуск дня»') + '</button></div>';
+}
+function dscNotify(title, body) {
+  toast(title + ' — ' + body);
+  try {
+    if (!window.Notification || Notification.permission !== 'granted') return;
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(r => r.showNotification(title, { body, icon: 'icon-192.png' })).catch(() => new Notification(title, { body }));
+    else new Notification(title, { body });
+  } catch (e) {}
+}
+function dscLog(t) { const d = dscDay(dscToday()); d.log = (d.log || []).concat([{ at: Date.now(), t }]).slice(-60); saveDSC(); if (dscSrv()) dscCall('/d/day/put', { date: dscToday(), patch: { log: t } }).catch(() => {}); }
+/* статус и проценты — на сервер, чтобы видел наставник (не чаще раза в 2 минуты; сразу — при смене статуса) */
+let dscPushT = 0;
+function dscPushStatus(r) {
+  if (!dscSrv() || !dscActive()) return;
+  const accs = {}; r.accs.filter(a => a.n || a.st !== 'ok').forEach(a => accs[a.id] = { name: a.name, pct: a.pct, lim: a.thr, stop: a.st === 'stop' || a.st === 'final', stop2: a.st === 'final', trades: a.n });
+  const sig = r.code + '|' + Object.keys(accs).map(k => k + ':' + Math.round(accs[k].pct * 10) + ':' + accs[k].stop + accs[k].stop2).join(',');
+  const key = r.today + '|' + sig, old = DSC.pushed.sig || '';
+  if (old === key) return;
+  const urgent = !old || old.split('|')[0] !== r.today || old.split('|')[1] !== r.code;
+  if (!urgent && Date.now() - dscPushT < 120000) return;
+  dscPushT = Date.now(); DSC.pushed.sig = key; saveDSC();
+  dscCall('/d/day/put', { date: r.today, patch: { accs, st: { code: r.code, text: r.text } } }).catch(() => { DSC.pushed.sig = ''; });
+}
+/* с сервера: команда, решения наставника, отметки с других устройств */
+async function dscPull(force) {
+  if (!dscSrv()) { updNavTeam(); return; }
+  try {
+    if (force || !DSC.me || Date.now() - DSC.meAt > 10 * 60000) { const me = await dscCall('/d/me'); DSC.me = { email: me.email, mentor: me.mentor, own: me.own, team: me.team }; DSC.meAt = Date.now(); }
+    const today = dscToday(), ev = dscLastTradeDay(today), dates = [today].concat(ev ? [ev] : []);
+    const j = await dscCall('/d/day/get', { dates });
+    dates.forEach(d => { const s = j.days[d]; if (!s) return; const l = dscDay(d);
+      if (s.morning && !l.morning) l.morning = { at: s.morning };
+      if (s.evening && !l.evening) l.evening = { at: s.evening };
+      if (s.re) l.re = s.re.map(x => ({ acc: x.acc, at: x.at, until: x.until, ans: x.ans }));
+      l.ov = s.ov || null; if (s.log) l.log = s.log; });
+    if (dscTeam() && !DSC.since) DSC.since = today;
+    saveDSC();
+  } catch (e) {}
+  updNavTeam(); dscApply();
+}
+/* ---------- формы чек-листов ---------- */
+function dscForm(id, qs) {
+  return '<div class="dscform" id="' + id + '">' + qs.map((q, i) => /:\s*$/.test(q)
+    ? '<div class="field"><label>' + esc(q.replace(/:\s*$/, '')) + '</label><textarea data-i="' + i + '" rows="2"></textarea></div>'
+    : '<label class="chk"><input type="checkbox" data-i="' + i + '">' + esc(q) + '</label>').join('') + '<div class="dn" style="font-size:12px;min-height:16px;margin:4px 0" data-err></div></div>';
+}
+function dscRead(id, qs, minLen) {
+  const box = $('#' + id), ans = [], err = box.querySelector('[data-err]'); let bad = '';
+  qs.forEach((q, i) => {
+    const el = box.querySelector('[data-i="' + i + '"]');
+    if (el.type === 'checkbox') { if (!el.checked && !bad) bad = 'Отметь все пункты'; ans.push({ q, a: el.checked ? '✓' : '' }); }
+    else { const v = el.value.trim(); if (v.length < (minLen || 2) && !bad) bad = 'Заполни поле «' + q.replace(/:\s*$/, '') + '»' + (minLen > 2 ? ' — хотя бы пару предложений' : ''); ans.push({ q, a: v }); }
+  });
+  err.textContent = bad; return bad ? null : ans;
+}
+async function dscSubmit(kind, date) {
+  const cfg = dscCfg(), qs = cfg[kind], ans = dscRead('dsc_' + kind, qs); if (!ans) return;
+  const d = dscDay(date); d[kind] = { at: Date.now(), ans }; saveDSC(); markDirty();
+  if (dscSrv()) { try { await dscCall('/d/day/put', { date, patch: { [kind]: true, log: kind === 'morning' ? 'Утренний чек-лист заполнен' : 'Разбор дня ' + date.split('-').reverse().join('.') + ' заполнен' } }); } catch (e) { toast('Сохранено на устройстве, сервер недоступен'); } }
+  toast(kind === 'morning' ? 'Чек-лист заполнен' : 'Разбор дня сохранён'); dscApply(); renderDisc();
+}
+async function dscReentry(accId) {
+  const cfg = dscCfg(), ans = dscRead('dsc_re_' + accId, cfg.reentry, 15); if (!ans) return;
+  const d = dscDay(dscToday()), pause = +cfg.pause || 0;
+  d.re = (d.re || []).concat([{ acc: accId, at: Date.now(), until: Date.now() + pause * 60000, ans }]); saveDSC(); markDirty();
+  const a = accById(accId) || {};
+  if (dscSrv()) { try { const j = await dscCall('/d/day/put', { date: dscToday(), patch: { re: { acc: accId, pause, ans }, log: 'Повторный допуск: «' + (a.name || '') + '»' + (pause ? ', пауза ' + pause + ' мин' : '') } }); if (j.day && j.day.re) d.re = j.day.re; saveDSC(); } catch (e) {} }
+  dscReOpen = '';
+  toast(pause ? 'Повторный допуск через ' + pause + ' мин' : 'Повторный допуск выдан'); dscApply(); renderDisc();
+}
+let dscReOpen = '';
+function renderDisc() {
+  const box = $('#discBody'); if (!box) return;
+  const r = dscEval(), cfg = dscCfg(), today = dscToday(), d = dscDay(today), team = dscTeam();
+  let h = '';
+  if (!dscActive()) {
+    h += '<div class="card" style="margin-bottom:14px"><h2>Режим допуска выключен</h2><p class="mut" style="font-size:12.5px;line-height:1.6;margin:6px 0 12px">Утром — чек-лист и план дня, вечером — разбор. Пока не заполнено, дашборд и сделки закрыты. ' +
+      'При просадке дня до лимита счёта (Настройки → Активный счёт → лимит дня, по умолчанию 2%) — стоп; вернуться можно после чек-листа повторного допуска и паузы.</p>' +
+      '<button class="btn pri" onclick="dscEnable(true)">Включить для себя</button></div>';
+  } else {
+    const cl = r.code === 'ok' ? 'ok' : ['morning', 'evening', 'pause'].includes(r.code) ? 'wait' : 'bad';
+    h += '<div class="dscgate ' + cl + '" style="margin-bottom:14px"><h2>' + (r.code === 'ok' ? '✓ Допуск есть' : esc(r.text.split(':')[0])) + '</h2><p>' + esc(r.text) + '</p></div>';
+    if (r.evDate && r.code === 'evening')
+      h += '<div class="card" style="margin-bottom:14px"><h2>Разбор дня ' + dFull(r.evDate + 'T00:00:00Z') + '</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Без разбора прошлого торгового дня сегодняшний чек-лист не откроется.</p>' +
+        dscForm('dsc_evening', cfg.evening) + '<button class="btn pri" onclick="dscSubmit(\'evening\',\'' + r.evDate + '\')">Сохранить разбор</button></div>';
+    else if (!d.morning && r.code === 'morning')
+      h += '<div class="card" style="margin-bottom:14px"><h2>Утренний чек-лист</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Отметь все пункты и запиши план — после этого откроется допуск.</p>' +
+        dscForm('dsc_morning', cfg.morning) + '<button class="btn pri" onclick="dscSubmit(\'morning\',\'' + today + '\')">Получить допуск</button></div>';
+    h += '<div class="card" style="margin-bottom:14px"><h2>Просадка дня по счетам</h2><div class="dscaccs">' + r.accs.map(a =>
+      '<div class="dscacc"><div style="flex:1;min-width:140px"><b>' + esc(a.name) + '</b><div class="mut" style="font-size:11.5px">' + a.n + ' ' + plural(a.n, ['сделка', 'сделки', 'сделок']) + ' сегодня · баланс на начало дня ' + nf(a.start, 0) + '</div></div>' +
+        '<div style="text-align:right"><b class="' + (a.pct < 0 ? 'dn' : a.pct > 0 ? 'up' : '') + '">' + (a.pct > 0 ? '+' : '') + nf(a.pct, 2) + '%</b><div class="mut" style="font-size:11.5px">лимит −' + nf(a.thr, 1) + '%</div></div>' +
+        '<div style="min-width:140px;text-align:right">' + (a.st === 'ok' ? '<span class="pill b">допуск</span>' : a.st === 'pause' ? '<span class="pill">пауза до ' + new Date(a.until).toTimeString().slice(0, 5) + '</span>' :
+          a.st === 'final' ? '<span class="pill s">стоп до завтра</span>' : '<button class="btn sm" onclick="dscReOpen=\'' + a.id + '\';renderDisc()">Повторный допуск</button>') + '</div></div>' +
+        (dscReOpen === a.id && a.st === 'stop' ? '<div class="dscre"><p class="mut" style="font-size:12px;margin-bottom:8px">Ответь честно и подробно' + (team ? ' — ответы увидит наставник' : '') + '. Дальше — пауза ' + (+cfg.pause || 0) + ' мин, затем торговля до −' + nf(a.thr + (+cfg.reExtra || 1), 1) + '% за день.</p>' +
+          dscForm('dsc_re_' + a.id, cfg.reentry) + '<button class="btn pri" onclick="dscReentry(\'' + a.id + '\')">Отправить и вернуться</button></div>' : '')
+    ).join('') + '</div></div>';
+    if (d.morning && !d.evening && r.accs.some(a => a.n))
+      h += '<div class="card" style="margin-bottom:14px"><h2>Разбор сегодняшнего дня</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Сделай вечером — тогда завтра утром сразу откроется чек-лист.</p>' + dscForm('dsc_evening', cfg.evening) +
+        '<button class="btn" onclick="dscSubmit(\'evening\',\'' + today + '\')">Сохранить разбор</button></div>';
+    const log = (d.log || []).slice().reverse();
+    if (log.length) h += '<div class="card" style="margin-bottom:14px"><h2>События дня</h2>' + log.map(x => '<div style="font-size:12.5px;padding:3px 0"><span class="mut">' + new Date(x.at).toTimeString().slice(0, 5) + '</span> · ' + esc(x.t) + '</div>').join('') + '</div>';
+  }
+  h += '<div class="card"><h2>Команда</h2>';
+  if (!dscSrv()) h += '<p class="mut" style="font-size:12.5px;margin-top:6px">Чтобы вступить в команду наставника, войди через Google: Настройки → Google Диск.</p>';
+  else if (team) h += '<p style="font-size:13px;margin:6px 0">«' + esc(team.name) + '» · наставник ' + esc(team.mentorEmail || '') + '</p><p class="mut" style="font-size:12px;margin-bottom:10px">Наставник видит только статус допуска, проценты просадки и ответы повторного допуска. Сделки, суммы и журнал — нет.</p><button class="btn sm" onclick="dscLeave()">Выйти из команды</button>';
+  else h += '<p class="mut" style="font-size:12.5px;margin:6px 0 10px">Есть код от наставника? Вступи в команду — правила допуска будет задавать он.</p><div class="row" style="gap:6px;max-width:380px;flex-wrap:nowrap"><input id="dscCode" placeholder="Код, например K7M2QX" style="text-transform:uppercase"><button class="btn pri" onclick="dscJoin()">Вступить</button></div>';
+  if (dscActive() && !team) h += '<div style="margin-top:12px"><button class="btn sm" onclick="dscEnable(false)">Выключить режим допуска</button></div>';
+  h += '</div>';
+  box.innerHTML = h;
+}
+function dscEnable(on) {
+  if (!on && !confirm('Выключить режим допуска?')) return;
+  DSC.on = on; if (on && !DSC.since) DSC.since = dscToday(); saveDSC();
+  if (on && window.Notification && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+  dscApply(); renderDisc();
+}
+async function dscJoin() {
+  const code = ($('#dscCode').value || '').trim(); if (!code) return toast('Впиши код команды');
+  try {
+    const j = await dscCall('/d/team/join', { code }); DSC.since = dscToday(); saveDSC(); await dscPull(true); toast('Ты в команде «' + j.team.name + '»');
+    if (window.Notification && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+  } catch (e) { toast(e.message || e); }
+  renderDisc();
+}
+async function dscLeave() {
+  if (!confirm('Выйти из команды? Наставник перестанет видеть твой статус.')) return;
+  try { await dscCall('/d/team/leave'); } catch (e) {}
+  await dscPull(true); renderDisc();
+}
+/* ---------- панель наставника ---------- */
+let TB = { date: '', rows: [], team: null, at: 0 };
+function updNavTeam() { const b = $('#navTeam'); if (b) b.style.display = DSC.me && DSC.me.mentor && dscSrv() ? '' : 'none'; }
+async function renderTeam(refresh) {
+  const box = $('#teamBody'); if (!box) return;
+  if (!dscSrv()) { box.innerHTML = '<div class="card">Войди через Google (Настройки → Google Диск), чтобы управлять командой.</div>'; return; }
+  if (!DSC.me || !DSC.me.mentor) { box.innerHTML = '<div class="card">Панель доступна только наставнику.</div>'; return; }
+  if (!DSC.me.own) {
+    box.innerHTML = '<div class="card" style="max-width:520px"><h2>Создать команду</h2><div class="field" style="margin-top:10px"><label>Название</label><input id="tName" value="Команда ' + esc((DSC.me.email || '').split('@')[0]) + '"></div><button class="btn pri" onclick="teamCreate()">Создать и получить код</button></div>';
+    return;
+  }
+  TB.date = TB.date || dscToday();
+  if (refresh !== false) {
+    try {
+      const prev = new Date(TB.date + 'T12:00:00Z'); prev.setUTCDate(prev.getUTCDate() - 1);
+      const j = await dscCall('/d/board', { date: TB.date, prev: prev.toISOString().slice(0, 10) }); TB.rows = j.rows; TB.team = j.team; TB.at = Date.now();
+    } catch (e) { box.innerHTML = '<div class="card dn">' + esc(e.message || e) + '</div>'; return; }
+  }
+  const t = TB.team || DSC.me.own, c = Object.assign({}, DSC_DEF, t.cfg || {});
+  const stc = s => !s ? ['mut', 'сегодня не открывал дневник'] : s.code === 'ok' ? ['up', '✓ допуск'] : ['morning', 'evening', 'pause'].includes(s.code) ? ['warn', s.text] : ['dn', s.text];
+  let h = '<div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><div><h2 style="margin:0">' + esc(t.name) + '</h2><div class="mut" style="font-size:12px">' + TB.rows.length + ' ' + plural(TB.rows.length, ['трейдер', 'трейдера', 'трейдеров']) + '</div></div>' +
+    '<div class="row" style="gap:8px;align-items:center"><span class="mut" style="font-size:12px">Код для вступления</span><b class="teamcode">' + esc(t.code || '') + '</b><button class="btn sm" onclick="navigator.clipboard.writeText(\'' + esc(t.code || '') + '\').then(()=>toast(\'Код скопирован\'))">Копировать</button></div></div></div>';
+  h += '<div class="row" style="gap:8px;margin-bottom:10px;align-items:center"><input type="date" id="tDate" value="' + TB.date + '" style="width:170px" onchange="TB.date=this.value;renderTeam()"><button class="btn sm" onclick="renderTeam()">⟳ Обновить</button><span class="mut" style="font-size:11.5px">' + (TB.at ? 'обновлено ' + new Date(TB.at).toTimeString().slice(0, 5) : '') + '</span></div>';
+  h += TB.rows.length ? TB.rows.map(r => {
+    const d = r.day || {}, p = r.prev || {}, s = stc(d.st), accs = Object.keys(d.accs || {}).map(k => Object.assign({ id: k }, d.accs[k]));
+    const ov = d.ov ? '<span class="pill ' + (d.ov.v === 'allow' ? 'b' : 's') + '">' + (d.ov.v === 'allow' ? 'допуск от тебя' : 'запрет от тебя') + '</span> ' : '';
+    return '<div class="card teamrow" style="margin-bottom:10px"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div><b>' + esc(r.email) + '</b> ' + ov +
+      '<div class="' + s[0] + '" style="font-size:12.5px;margin-top:2px">' + esc(s[1]) + '</div></div>' +
+      '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm" onclick="teamAct(\'' + r.sub + '\',\'allow\')">Дать допуск</button><button class="btn sm" onclick="teamAct(\'' + r.sub + '\',\'deny\')">Запретить</button>' +
+      (d.ov ? '<button class="btn sm" onclick="teamAct(\'' + r.sub + '\',\'clear\')">Обычные правила</button>' : '') + '</div></div>' +
+      '<div class="teamgrid"><div><span class="mut">Утро</span><b class="' + (d.morning ? 'up' : 'mut') + '">' + (d.morning ? '✓ ' + new Date(d.morning).toTimeString().slice(0, 5) : '—') + '</b></div>' +
+      '<div><span class="mut">Разбор накануне</span><b class="' + (p.evening ? 'up' : 'mut') + '">' + (p.evening ? '✓' : '—') + '</b></div>' +
+      accs.map(a => '<div><span class="mut">' + esc(a.name) + '</span><b class="' + (a.stop ? 'dn' : a.pct < 0 ? 'warn' : 'up') + '">' + (a.pct > 0 ? '+' : '') + nf(a.pct, 2) + '%</b><span class="mut" style="font-size:11px">лимит −' + nf(a.lim, 1) + '% · ' + a.trades + ' сд.' + (a.stop2 ? ' · стоп до завтра' : a.stop ? ' · стоп' : '') + '</span></div>').join('') + '</div>' +
+      ((d.re || []).length ? '<div class="teamre"><b style="font-size:12.5px">Повторный допуск: ' + d.re.length + '</b>' + d.re.map(x => '<div class="mut" style="font-size:11.5px;margin-top:6px">' + new Date(x.at).toTimeString().slice(0, 5) + ' · ' + esc((d.accs && d.accs[x.acc] && d.accs[x.acc].name) || '') + '</div>' + (x.ans || []).map(q => '<div style="font-size:12.5px;margin:2px 0"><span class="mut">' + esc(q.q.replace(/:\s*$/, '')) + ':</span> ' + esc(q.a) + '</div>').join('')).join('') + '</div>' : '') +
+      '<div style="text-align:right;margin-top:6px"><button class="btn sm" style="color:var(--dn)" onclick="teamKick(\'' + r.sub + '\',\'' + esc(r.email) + '\')">Удалить из команды</button></div></div>';
+  }).join('') : '<div class="card mut" style="margin-bottom:10px">Пока никого. Отправь трейдерам код — они вводят его в «Допуск дня → Команда».</div>';
+  h += '<div class="card" style="margin-top:14px"><h2>Правила и чек-листы команды</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Один пункт — одна строка. Строка с двоеточием в конце — поле для ответа текстом, без двоеточия — галочка.</p>' +
+    '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">' +
+    [['morning', 'Утренний чек-лист'], ['evening', 'Разбор дня'], ['reentry', 'Повторный допуск']].map(x => '<div class="field"><label>' + x[1] + '</label><textarea id="tc_' + x[0] + '" rows="7">' + esc(c[x[0]].join('\n')) + '</textarea></div>').join('') + '</div>' +
+    '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px"><div class="field"><label>Пауза после повторного допуска, мин</label><input id="tc_pause" type="number" min="0" max="480" value="' + c.pause + '"></div>' +
+    '<div class="field"><label>Повторных допусков в день</label><input id="tc_reMax" type="number" min="0" max="5" value="' + c.reMax + '"></div>' +
+    '<div class="field"><label>Дополнительно после допуска, %</label><input id="tc_reExtra" type="number" min="0.1" max="10" step="0.1" value="' + c.reExtra + '"></div></div>' +
+    '<p class="mut" style="font-size:11.5px;margin-bottom:10px">Пример: лимит счёта 2%, дополнительно 1% → после повторного допуска стоп на −3% за день. Лимит каждого счёта трейдер задаёт в настройках счёта.</p>' +
+    '<button class="btn pri" onclick="teamSaveCfg()">Сохранить правила</button></div>';
+  box.innerHTML = h;
+}
+async function teamCreate() {
+  try { await dscCall('/d/team/create', { name: ($('#tName').value || '').trim() }); await dscPull(true); toast('Команда создана'); } catch (e) { toast(e.message || e); }
+  renderTeam();
+}
+async function teamAct(sub, act) {
+  const reason = act === 'clear' ? '' : prompt(act === 'allow' ? 'Причина допуска (увидит трейдер):' : 'Причина запрета (увидит трейдер):');
+  if (reason === null) return;
+  try { await dscCall('/d/act', { sub, date: TB.date || dscToday(), act, reason }); toast('Готово'); } catch (e) { toast(e.message || e); }
+  renderTeam();
+}
+async function teamKick(sub, email) {
+  if (!confirm('Удалить ' + email + ' из команды?')) return;
+  try { await dscCall('/d/team/kick', { sub }); } catch (e) { toast(e.message || e); }
+  renderTeam();
+}
+async function teamSaveCfg() {
+  const L = id => ($('#tc_' + id).value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const cfg = { morning: L('morning'), evening: L('evening'), reentry: L('reentry'), pause: +$('#tc_pause').value, reMax: +$('#tc_reMax').value, reExtra: +$('#tc_reExtra').value };
+  if (!cfg.morning.length || !cfg.reentry.length) return toast('Утренний чек-лист и повторный допуск не могут быть пустыми');
+  try { await dscCall('/d/team/cfg', { cfg }); await dscPull(true); toast('Правила сохранены — у трейдеров обновятся в течение 10 минут'); } catch (e) { toast(e.message || e); }
+  renderTeam();
+}
+/* каждые 5 минут — свежие сделки из cTrader и решения наставника; каждую минуту — пересчёт (конец паузы, смена дня) */
+setInterval(() => {
+  if (document.hidden) return;
+  if (dscActive() && typeof CT !== 'undefined' && Object.keys(CT.links || {}).length && ctReady() && !ctBusy) ctSync(true);
+  dscPull(); if (currentPage === 'team') renderTeam();
+}, 5 * 60000);
+setInterval(() => { if (dscActive()) dscApply(); }, 60000);
+setTimeout(() => { dscApply(); dscPull(true); }, 1500);
+
+window.DSC_READY = true;
 setTimeout(() => (gMode() ? gToken().catch(() => {}) : Promise.resolve()).then(() => gdReady() ? Promise.resolve(gdPull(true)).catch(() => {}) : 0).then(() => { if (CT.auto !== false && Object.keys(CT.links || {}).length && ctReady()) ctSync(true); }), 1200);
 </script>
 </body>
