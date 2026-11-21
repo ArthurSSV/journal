@@ -763,6 +763,9 @@ input[type=date],input[type=datetime-local]{min-width:0;max-width:100%;box-sizin
   /* меньше пустоты внизу коротких страниц */
   .main{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
 }
+.ctrec{flex-basis:100%;font-size:12px;margin-top:6px;padding:8px 10px;border-radius:10px;line-height:1.5}
+.ctrec.ok{background:var(--up-bg);color:var(--up)}.ctrec.bad{background:rgba(255,159,10,.12)}.ctrec .mut{font-size:11.5px}
+.ctacc{flex-wrap:wrap}
 /* ===== СВЕТЛАЯ ТЕМА ===== */
 body.light{--bg:#f2f2f7;--bg2:#ffffff;--bg3:#e9e9ee;--line:#dcdce1;--tx:#1c1c1e;--tx2:#6e6e73;--tx3:#8e8e93;
   --up:#1f9d45;--up-bg:rgba(52,199,89,.14);--dn:#e5302a;--dn-bg:rgba(255,59,48,.12);--acc:#007aff;--acc2:#0a84ff;--warn:#c77700;color-scheme:light}
@@ -1335,7 +1338,9 @@ body.light .thsw{background:#e9e9ee}body.light .thsw span{color:#6e6e73}body.lig
             </div>
             <div>
               <div class="fgtitle" style="margin-bottom:6px">3. Как загружать</div>
-              <div class="field"><label>Первая загрузка — с даты</label><input id="ctFrom" type="date" onchange="ctReadOpts()"></div>
+              <label class="chk"><input type="checkbox" id="ctFromStart" onchange="ctReadOpts()">Загружать всю историю — с открытия счёта</label>
+              <div class="field" id="ctFromBox"><label>Первая загрузка — с даты</label><input id="ctFrom" type="date" onchange="ctReadOpts()"></div>
+              <button class="btn sm" style="margin-bottom:10px" onclick="ctReloadAll()">Загрузить всю историю заново</button>
               <div class="field"><label>Время сделок</label><select id="ctTz" onchange="ctReadOpts()">
                 <option value="auto">как на этом устройстве</option><option value="0">UTC</option><option value="1">UTC+1</option><option value="2">UTC+2</option><option value="3">UTC+3</option><option value="4">UTC+4</option></select></div>
               <label class="chk"><input type="checkbox" id="ctAuto" onchange="ctReadOpts()">Синхронизировать при открытии дневника</label>
@@ -1758,7 +1763,7 @@ function accStats(a) {
   let tr = [];
   try { tr = JSON.parse(localStorage.getItem(TKEY(a.id))) || []; } catch (e) {}
   const net = tr.reduce((s, t) => s + (+t.net || 0), 0);
-  return { n: tr.length, net, eq: (+a.balance || 0) + net };
+  return { n: tr.length, net, eq: (+a.balance || 0) + net + cashAdj(a) };;
 }
 function switchAcc(id) {
   if (id === ACC.active) return;
@@ -2900,6 +2905,11 @@ function equityChart(curve, hl) {
         '<br>' + (tot >= 0 ? 'прибыль' : 'убыток') + ' от депозита: <b class="' + cls(tot) + '">' + money(tot) + ' (' + (tot > 0 ? '+' : '') + nf(totPct, 2) + '%)</b>' +
         '<br><span class="mut">сделка ' + i + ' из ' + (curve.length - 1) + '</span>'
     };
+  });
+  cashAfter(S).forEach(cf => {                       // ромбик внизу графика: вывод / пополнение
+    const ts = new Date(cf.at).getTime(); let i = curve.findIndex(p => p.x >= ts); if (i < 0) return; const x = X(i), yy = h - pad.b - 7;
+    g.save(); g.translate(x, yy); g.rotate(Math.PI / 4); g.fillStyle = cf.delta < 0 ? '#ff9f0a' : '#0a84ff'; g.fillRect(-4, -4, 8, 8); g.restore();
+    pts.push({ i: 1e6 + pts.length, x, y: yy, html: '<b>' + dt(cf.at) + '</b><br>' + (cf.delta < 0 ? 'Вывод / выплата' : 'Пополнение') + ': <b class="' + cls(cf.delta) + '">' + money(cf.delta) + '</b>' + (cf.note ? '<br><span class="mut">' + esc(cf.note) + '</span>' : '') + '<br><span class="mut">в результат торговли не входит</span>' });
   });
   hookTip('#cEquity', pts, p => equityChart(EQ_CURVE, p));
 }
@@ -5370,7 +5380,7 @@ function gsClose() { $('#gsMask').classList.remove('on'); $('#gsFrame').src = 'a
    в дневник секрет приходит только на время синхронизации и нигде не сохраняется.
    Связь с cTrader — WebSocket JSON: wss://live.ctraderapi.com:5036 (демо — demo.ctraderapi.com:5036). */
 const LS_CT = 'fxj.ct.v1';
-let CT = { conn: '', clientId: '', connected: false, expires: 0, accounts: [], links: {}, last: {}, tz: 'auto', auto: true, from: '' };
+let CT = { conn: '', clientId: '', connected: false, expires: 0, accounts: [], links: {}, last: {}, tz: 'auto', auto: true, from: '', fromStart: true, bal: {}, cashLast: {} };
 try { Object.assign(CT, JSON.parse(localStorage.getItem(LS_CT)) || {}); } catch (e) {}
 function saveCT() { localStorage.setItem(LS_CT, JSON.stringify(CT)); }
 let ctBusy = false, ctRedirShow = false;
@@ -5593,7 +5603,7 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
   const existing = ctExisting(accId);
   let from = CT.last[ctid] ? CT.last[ctid] - 3 * 864e5 : 0;
   if (!from && existing.length) from = Math.max(...existing.map(t => new Date(t.closeTime || t.openTime).getTime()).filter(v => v > 0)) - 7 * 864e5;
-  if (!from) from = CT.from ? Date.parse(CT.from + 'T00:00:00Z') : Date.now() - 90 * 864e5;
+  if (!from) from = CT.fromStart !== false ? (+trader.registrationTimestamp || Date.now() - 3 * 365 * 864e5) : (CT.from ? Date.parse(CT.from + 'T00:00:00Z') : Date.now() - 90 * 864e5);
   if (trader.registrationTimestamp) from = Math.max(from, +trader.registrationTimestamp);
   const to = Date.now() - 1000, deals = [];
   const WEEK = 7 * 864e5;
@@ -5652,9 +5662,62 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
     if (accId === S.id) { TR = TR.concat(fresh); save(); }
     else { localStorage.setItem(TKEY(accId), JSON.stringify(existing.concat(fresh))); ACC_IDX = null; markDirty(); }
   }
+  try { await ctCashFlow(c, ctid, accId, trader, report); } catch (e) { /* без истории денег — просто сверка */ }
   const enr = await ctEnrich(c, ctid, accId, report);
-  CT.last[ctid] = Date.now(); saveCT();
+  CT.last[ctid] = Date.now();
+  if (trader.balance != null) { CT.bal = CT.bal || {}; CT.bal[ctid] = { bal: ctNum(trader.balance, trader.moneyDigits), at: Date.now() }; }
+  saveCT();
   return { added: fresh.length, enriched: enr, seen: rows.length, balance: trader.balance != null ? ctNum(trader.balance, trader.moneyDigits) : null, acc };
+}
+/* пополнения, выводы, выплаты: не сделки — хранятся отдельно и не смешиваются с результатом торговли */
+async function ctCashFlow(c, ctid, accId, trader, report) {
+  const acc = accById(accId); if (!acc) return;
+  CT.cashLast = CT.cashLast || {};
+  let from = CT.cashLast[ctid] ? CT.cashLast[ctid] - 3 * 864e5 : (+trader.registrationTimestamp || Date.now() - 3 * 365 * 864e5);
+  const to = Date.now() - 1000, WEEK = 7 * 864e5 - 1000, got = [];
+  for (let a = from; a < to; a += WEEK) {
+    if (report) report('счёт ' + esc(acc.name) + ': пополнения и выводы с ' + dFull(new Date(a).toISOString()) + '…');
+    const r = await c.send(2143, { ctidTraderAccountId: +ctid, fromTimestamp: Math.floor(a), toTimestamp: Math.floor(Math.min(to, a + WEEK)) }, 60000);
+    (r.depositWithdraw || []).forEach(x => got.push(x));
+    await ctSleep(250);
+  }
+  const have = {}; (acc.cash || []).forEach(x => have[x.id] = x);
+  got.forEach(x => { const md = x.moneyDigits != null ? x.moneyDigits : (trader.moneyDigits != null ? trader.moneyDigits : 2);
+    const id = String(x.balanceHistoryId || (x.changeBalanceTimestamp + ':' + x.delta));
+    have[id] = { id, ts: +x.changeBalanceTimestamp, at: ctWall(+x.changeBalanceTimestamp), delta: ctNum(x.delta, md), balance: ctNum(x.balance, md), note: x.externalNote || '' }; });
+  acc.cash = Object.values(have).sort((a, b) => a.ts - b.ts);
+  CT.cashLast[ctid] = Date.now();
+  // стартовый депозит = всё, что зачислено до первой сделки
+  const trs = ctExisting(accId), t0 = trs.length ? Math.min(...trs.map(t => ctUnwall(t.openTime || t.closeTime)).filter(v => !isNaN(v))) : Infinity;
+  const before = acc.cash.filter(x => x.ts <= t0), start = before.reduce((s, x) => s + x.delta, 0);
+  if (before.length && start > 0) { acc.balance = Math.round(start * 100) / 100; acc.balSrc = 'cTrader'; }
+  saveS();
+}
+/* движение денег после начала торговли (выводы, выплаты, доливки) */
+function cashAfter(a) {
+  a = a || S; if (!a.cash || !a.cash.length) return [];
+  const un = v => { try { return ctUnwall(v); } catch (e) { return Date.parse(v); } };
+  const trs = accTrades(a.id), t0 = trs.length ? Math.min(...trs.map(t => un(t.openTime || t.closeTime)).filter(v => !isNaN(v))) : Infinity;
+  return a.cash.filter(x => x.ts > t0);
+}
+function cashAdj(a) { return cashAfter(a).reduce((s, x) => s + (+x.delta || 0), 0); }
+/* сверка капитала дневника с балансом cTrader */
+function ctRecon(ctid) {
+  const accId = CT.links[ctid], a = accById(accId), b = (CT.bal || {})[ctid]; if (!a || !b) return null;
+  const net = accTrades(a.id).reduce((s, t) => s + (+t.net || 0), 0), cap = (+a.balance || 0) + net + cashAdj(a);
+  return { a, cap, bal: b.bal, diff: Math.round((b.bal - cap) * 100) / 100 };
+}
+function ctFit(ctid) {
+  const r = ctRecon(ctid); if (!r || Math.abs(r.diff) < 0.01) return;
+  if (!confirm('Подогнать депозит «' + r.a.name + '» под баланс cTrader?\n\nДепозит: ' + nf(r.a.balance) + ' → ' + nf((+r.a.balance || 0) + r.diff) + '\nПосле этого капитал в дневнике совпадёт с cTrader (' + nf(r.bal) + ').\n\nТак стоит делать, если старую историю уже не восстановить.')) return;
+  r.a.balance = Math.round(((+r.a.balance || 0) + r.diff) * 100) / 100; r.a.balSrc = 'fit';
+  saveS(); load(); renderAll(); fillCT(); toast('Депозит подогнан — капитал совпадает с cTrader');
+}
+async function ctReloadAll() {
+  if (!confirm('Загрузить всю историю с открытия каждого привязанного счёта, включая пополнения и выводы?\n\nДубли не появятся — уже загруженные сделки пропускаются. Займёт несколько минут.')) return;
+  CT.fromStart = true; Object.keys(CT.links || {}).forEach(k => { delete CT.last[k]; if (CT.cashLast) delete CT.cashLast[k]; });
+  Object.values(CT.links || {}).forEach(id => { const a = accById(id); if (a) a.balSrc = a.balSrc === 'fit' ? '' : a.balSrc; });
+  saveCT(); ctSync();
 }
 async function ctSync(quiet) {
   if (ctBusy) return;
@@ -5678,7 +5741,9 @@ async function ctSync(quiet) {
     const enr = res.reduce((s, r) => s + (r.enriched || 0), 0);
     const msg = (enr ? 'Стопы и тейки уточнены у ' + enr + ' сделок. ' : '') + (CT_EMPTY ? 'У ' + CT_EMPTY + ' позиций cTrader не вернул ордера. ' : '') + (CT_ERR ? 'Ошибка при чтении ордеров: ' + CT_ERR + '. ' : '') + (added ? 'Из cTrader добавлено сделок: ' + added + ' (' + res.filter(r => r.added).map(r => r.acc.name + ' +' + r.added).join(', ') + ')' : 'Новых сделок в cTrader нет — всё уже в дневнике');
     ctStatus('<span class="up">' + esc(msg) + '</span><br><span class="mut">Синхронизировано ' + dt(ctWall(Date.now())) +
-      res.filter(r => r.balance != null).map(r => ' · баланс «' + esc(r.acc.name) + '» в cTrader: ' + nf(r.balance)).join('') + '</span>');
+      res.filter(r => r.balance != null).map(r => ' · баланс «' + esc(r.acc.name) + '» в cTrader: ' + nf(r.balance)).join('') + '</span>' +
+      (() => { const bad = Object.keys(CT.links || {}).map(ctRecon).filter(x => x && Math.abs(x.diff) >= 1);
+        return bad.length ? '<br><span class="warn">Капитал не сходится с cTrader: ' + bad.map(x => '«' + esc(x.a.name) + '» ' + (x.diff > 0 ? '+' : '') + nf(x.diff)).join(', ') + '. Подробности и кнопка «Подогнать» — у счёта ниже.</span>' : ''; })());
     if (!quiet || added) toast(msg);
   } catch (e) {
     const m = String(e.message || e);
@@ -5841,6 +5906,15 @@ async function loadCandlesCT(ctid) {
 const CT_REASON = { sl: 'по Stop Loss', tp: 'по Take Profit', slp: 'по стопу в плюсе (SL был перенесён)', be: 'в безубыток', manual: 'вручную', stopout: 'стоп-аут' };
 const CT_TAG = { sl: ['sl', 'SL'], tp: ['tp', 'TP'], slp: ['tp', 'SL+'], be: ['be', 'БУ'], stopout: ['sl', 'SO'] };
 
+function ctReconHtml(ctid) {
+  const r = ctRecon(ctid); if (!r) return '';
+  const ca = cashAfter(r.a), cs = ca.reduce((s, x) => s + x.delta, 0);
+  const cash = ca.length ? ' · движение денег после старта: <b class="' + cls(cs) + '">' + (cs > 0 ? '+' : '') + nf(cs) + '</b> (' + ca.length + ')' : '';
+  if (Math.abs(r.diff) < 1) return '<div class="ctrec ok">✓ Капитал сходится с cTrader: ' + nf(r.bal) + cash + '</div>';
+  return '<div class="ctrec bad"><div>Дневник <b>' + nf(r.cap) + '</b> · cTrader <b>' + nf(r.bal) + '</b> · разница <b class="' + cls(r.diff) + '">' + (r.diff > 0 ? '+' : '') + nf(r.diff) + '</b>' + cash + '</div>' +
+    '<div class="mut">Обычно это ранняя история или выводы, которые не загружены. Сначала попробуй «Загрузить всю историю», если не сойдётся — подгони депозит.</div>' +
+    '<div class="row" style="gap:6px;margin-top:6px"><button class="btn sm" onclick="ctReloadAll()">Загрузить всю историю</button><button class="btn sm" onclick="ctFit(\'' + ctid + '\')">Подогнать депозит</button></div></div>';
+}
 function fillCT() {
   const box = $('#ctAccs'); if (!box) return;
   const cb = $('#ctConnBox');
@@ -5852,10 +5926,11 @@ function fillCT() {
   if ($('#ctTz')) $('#ctTz').value = CT.tz == null ? 'auto' : String(CT.tz);
   if ($('#ctAuto')) $('#ctAuto').checked = CT.auto !== false;
   if ($('#ctFrom')) $('#ctFrom').value = CT.from || dOnly(Date.now() - 90 * 864e5);
+  if ($('#ctFromStart')) { $('#ctFromStart').checked = CT.fromStart !== false; $('#ctFromBox').style.display = CT.fromStart !== false ? 'none' : ''; }
   const opts = v => '<option value="">не загружать</option>' + liveAccs().map(a => '<option value="' + a.id + '"' + (a.id === v ? ' selected' : '') + '>в «' + esc(a.name) + '»</option>').join('') + '<option value="__new">+ создать новый счёт</option>';
   box.innerHTML = CT.accounts.length ? CT.accounts.map(a => '<div class="ctacc"><div><b>' + esc(a.login || a.ctid) + '</b> <span class="pill ' + (a.live ? 'b' : '') + '">' + (a.live ? 'реальный' : 'демо') + '</span>' +
     '<div class="mut" style="font-size:11.5px">' + esc(a.broker || 'cTrader') + (CT.last[a.ctid] ? ' · синхр. ' + dt(ctWall(CT.last[a.ctid])) : '') + '</div></div>' +
-    '<select onchange="ctLink(\'' + a.ctid + '\', this.value)">' + opts(CT.links[a.ctid]) + '</select></div>').join('')
+    '<select onchange="ctLink(\'' + a.ctid + '\', this.value)">' + opts(CT.links[a.ctid]) + '</select>' + ctReconHtml(a.ctid) + '</div>').join('')
     : '<div class="mut" style="font-size:12px">Счета появятся после шага 3.</div>';
   const linked = Object.keys(CT.links).filter(k => accById(CT.links[k])).length;
   $$('.ctSyncBtn').forEach(b => b.style.display = linked ? '' : 'none');
@@ -5870,7 +5945,7 @@ function ctRecheck() {
 }
 function ctReadOpts() {
   CT.tz = $('#ctTz').value === 'auto' ? 'auto' : +$('#ctTz').value;
-  CT.auto = $('#ctAuto').checked; CT.from = $('#ctFrom').value || ''; saveCT();
+  CT.auto = $('#ctAuto').checked; CT.from = $('#ctFrom').value || ''; CT.fromStart = $('#ctFromStart') ? $('#ctFromStart').checked : CT.fromStart; saveCT(); fillCT();
 }
 
 /* =================== ЗАКРЫТИЕ НЕДЕЛИ / МЕСЯЦА / СТОП-ФАКТОРЫ =================== */
