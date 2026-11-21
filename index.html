@@ -163,9 +163,9 @@ canvas{display:block;width:100%}
 .kq{background:#1a2029;border-radius:14px;padding:14px 16px 12px;position:relative;min-width:0}
 .kq-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}
 .kq-t{font-size:14px;font-weight:600;color:#d8dee6;display:flex;align-items:center;gap:8px;white-space:nowrap}
-.kq-i{width:22px;height:22px;border-radius:50%;border:1.5px solid #9aa7b5;color:#c3cdd8;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+.kq-i{width:22px;height:22px;flex:0 0 auto;color:#c3cdd8;display:block}
 .kq-per{cursor:pointer;color:#a3a8b0;font-size:13px;user-select:none;white-space:nowrap;outline:none}
-.kq-per:hover{color:#d8dee6}.kq-per .kq-ch{display:inline-block;font-size:12px;transition:transform .15s}.kq-per.open .kq-ch{transform:rotate(180deg)}
+.kq-per{display:inline-flex;align-items:center;gap:5px;line-height:1}.kq-per:hover{color:#d8dee6}.kq-per .kq-ch{width:10px;height:10px;display:block;transition:transform .15s}.kq-per.open .kq-ch{transform:rotate(180deg)}
 .kq-menu{position:absolute;right:12px;top:40px;background:#262c34;border-radius:10px;padding:4px;z-index:20;display:none;min-width:130px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
 .kq-menu.on{display:block}
 .kq-mi{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:7px;font-size:13px;color:#a3a8b0;cursor:pointer;user-select:none}
@@ -175,9 +175,15 @@ canvas{display:block;width:100%}
 .kq-d{font-size:13px;line-height:1.55;min-width:0}
 .kq-c{display:block;font-size:12.5px;font-weight:600}.kq-m{display:block;color:#a3a8b0}.kq-x{display:block;margin-top:2px;color:#d8dee6}
 .kq-s{width:100%;height:48px;display:block}
-.kq-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}
+.kq-strip{background:#1a2029;border-radius:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:12px}
+.kq-it{padding:12px 16px;border-left:1px solid #262d36;min-width:0}.kq-it:first-child{border-left:0}
+.kq-it .k{font-size:12px;color:#a3a8b0;margin-bottom:4px;white-space:nowrap}
+.kq-it .v{font-size:17px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kq-it .s{font-size:11.5px;color:#a3a8b0;margin-top:3px;white-space:nowrap}
+.kq-bar{height:5px;border-radius:3px;background:#2a3140;display:flex;overflow:hidden;margin-top:6px}.kq-bar i{display:block;height:100%}
+.kq-dots{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}.kq-dots i{width:7px;height:7px;border-radius:50%;display:block}.kq-dots i.w{background:var(--up)}.kq-dots i.l{background:var(--dn)}
 .kq-sm{background:#1a2029;border-radius:10px;padding:9px 12px}.kq-sm span{display:block;font-size:12px;color:#a3a8b0}.kq-sm b{font-size:16px;font-weight:600}
-@media(max-width:560px){.kq-grid{grid-template-columns:1fr}.kq-v{font-size:28px}.kq-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.kq-grid{grid-template-columns:1fr}.kq-v{font-size:28px}.kq-strip{grid-template-columns:repeat(2,1fr)}.kq-it:nth-child(3){border-left:0}}
 .dscpill{margin:10px 12px 0;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line);font-size:11.5px;line-height:1.35}
 .dscpill b{display:block;font-size:13px}.dscpill span{color:var(--tx2);display:block}
 .dscpill.ok{background:var(--up-bg);border-color:transparent}.dscpill.ok b{color:var(--up)}
@@ -1739,7 +1745,7 @@ function kpiSpark(arr, col) {
 }
 function kpiPer(key) {
   const cur = KPIP[key] || '30', lab = (KPI_OPT.find(o => o[0] === cur) || KPI_OPT[1])[1];
-  return '<span class="kq-per" role="button" tabindex="0" onclick="kpiMenu(event,\'' + key + '\')">' + lab + ' <span class="kq-ch">⌄</span></span>' +
+  return '<span class="kq-per" role="button" tabindex="0" onclick="kpiMenu(event,\'' + key + '\')">' + lab + '<svg class="kq-ch" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
     '<div class="kq-menu" id="kqm_' + key + '">' + KPI_OPT.map(o => '<div class="kq-mi' + (o[0] === cur ? ' sel' : '') + '" onclick="kpiSet(event,\'' + key + '\',\'' + o[0] + '\')">' + o[1] + '<span>✓</span></div>').join('') + '</div>';
 }
 function kpiMenu(e, key) {
@@ -1750,9 +1756,27 @@ function kpiMenu(e, key) {
 }
 function kpiSet(e, key, v) { e.stopPropagation(); KPIP[key] = v; localStorage.setItem(LS_KPI, JSON.stringify(KPIP)); renderKpis(); }
 document.addEventListener('click', () => { $$('.kq-menu').forEach(x => x.classList.remove('on')); $$('.kq-per').forEach(x => x.classList.remove('open')); });
+const KPI_IC = {
+  pnl: '<circle cx="12" cy="12" r="10"/><path d="M14.8 9a2.5 2.5 0 0 0-2.3-1.5h-1.3a2.2 2.2 0 0 0 0 4.4h1.6a2.2 2.2 0 0 1 0 4.4h-1.3A2.5 2.5 0 0 1 9.2 15M12 6v1.5M12 16.5V18"/>',
+  wr: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.6"/>',
+  dd: '<path d="M3 6l6.5 6.5 4-4L21 16"/><path d="M15 16h6v-6"/>',
+  pf: '<path d="M12 4v16M7 20h10M5 7h14"/><path d="M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/>'
+};
 function kpiCard(key, icon, title, valHtml, valCls, lines, spark, per) {
-  return '<div class="kq"><div class="kq-h"><span class="kq-t"><span class="kq-i">' + icon + '</span>' + title + '</span>' + (per ? kpiPer(key) : '') + '</div>' +
+  return '<div class="kq"><div class="kq-h"><span class="kq-t"><svg class="kq-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (KPI_IC[key] || '') + '</svg>' + title + '</span>' + (per ? kpiPer(key) : '') + '</div>' +
     '<div class="kq-v ' + valCls + '">' + valHtml + '</div><div class="kq-b"><div class="kq-d">' + lines + '</div>' + spark + '</div></div>';
+}
+function kpiStrip(st, arr, days) {
+  if (!st.n) return '';
+  const W = Array(Math.min(st.bw, 12)).fill('<i class="w"></i>').join(''), L = Array(Math.min(st.bl, 12)).fill('<i class="l"></i>').join('');
+  const tot = st.avgW + st.avgL, wp = tot ? st.avgW / tot * 100 : 50, per = days ? arr.length / days : 0;
+  const rat = (a, b) => b > 0 ? nf(a / b, 2) + ' : 1' : '—';
+  return '<div class="kq-strip">' +
+    '<div class="kq-it"><div class="k">Серии подряд</div><div class="v"><span class="up">' + st.bw + '</span> <span class="mut">/</span> <span class="dn">' + st.bl + '</span></div><div class="kq-dots">' + W + '<i></i>' + L + '</div></div>' +
+    '<div class="kq-it"><div class="k">Ср. прибыль / убыток</div><div class="v"><span class="up">+' + nf(st.avgW) + '</span> <span class="mut">/</span> <span class="dn">−' + nf(st.avgL) + '</span></div>' +
+      '<div class="kq-bar"><i style="width:' + wp.toFixed(1) + '%;background:var(--up)"></i><i style="width:' + (100 - wp).toFixed(1) + '%;background:var(--dn)"></i></div><div class="s">соотношение ' + rat(st.avgW, st.avgL) + '</div></div>' +
+    '<div class="kq-it"><div class="k">Лучшая / худшая</div><div class="v"><span class="up">+' + nf(st.best) + '</span> <span class="mut">/</span> <span class="dn">' + (st.worst < 0 ? '−' : '') + nf(Math.abs(st.worst)) + '</span></div><div class="s">разброс ' + rat(st.best, Math.abs(st.worst)) + '</div></div>' +
+    '<div class="kq-it"><div class="k">Торговых дней</div><div class="v">' + days + '</div><div class="s">≈ ' + nf(per, 1) + ' сделки в день</div></div></div>';
 }
 function renderKpis() {
   const box = $('#kpis'); if (!box) return;
@@ -1789,10 +1813,7 @@ function renderKpis() {
     '<span class="kq-c ' + cls(st.exp) + '">' + (st.n ? m(st.exp) : '—') + '</span><span class="kq-m">матожидание на сделку</span><span class="kq-x">Средний R: <span class="' + (st.avgR > 0 ? 'up' : st.avgR < 0 ? 'dn' : '') + '">' + (st.avgR === null ? '—' : nf(st.avgR) + 'R') + '</span></span>',
     kpiSpark(sp4, '#9d95ee'), false);
   const days = new Set(arr.map(t => dOnly(t.closeTime || t.openTime))).size;
-  box.innerHTML = '<div class="kq-grid">' + k1 + k2 + k3 + k4 + '</div><div class="kq-row">' +
-    [['Серии', st.bw + ' / ' + st.bl, '', 'побед / поражений подряд'], ['Ср. прибыль', st.n ? '+' + nf(st.avgW) : '—', 'up', ''], ['Ср. убыток', st.n ? '−' + nf(st.avgL) : '—', 'dn', ''],
-     ['Лучшая / худшая', st.n ? '<span class="up">+' + nf(st.best) + '</span> / <span class="dn">' + (st.worst < 0 ? '−' : '') + nf(Math.abs(st.worst)) + '</span>' : '—', '', ''], ['Торговых дней', String(days), '', '']]
-      .map(x => '<div class="kq-sm"' + (x[3] ? ' title="' + x[3] + '"' : '') + '><span>' + x[0] + '</span><b class="' + x[2] + '">' + x[1] + '</b></div>').join('') + '</div>';
+  box.innerHTML = '<div class="kq-grid">' + k1 + k2 + k3 + k4 + '</div>' + kpiStrip(st, arr, days);
 }
 function renderDash() {
   const arr = periodTrades(), st = stats(arr);
