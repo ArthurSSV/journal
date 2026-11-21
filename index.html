@@ -766,6 +766,7 @@ input[type=date],input[type=datetime-local]{min-width:0;max-width:100%;box-sizin
 .ctrec{flex-basis:100%;font-size:12px;margin-top:6px;padding:8px 10px;border-radius:10px;line-height:1.5}
 .ctrec.ok{background:var(--up-bg);color:var(--up)}.ctrec.bad{background:rgba(255,159,10,.12)}.ctrec .mut{font-size:11.5px}
 .ctacc{flex-wrap:wrap}
+.ctacc{position:relative}.ctacc .ctrec{order:4}.ctacc .ctx{order:3;width:26px;height:26px;border-radius:50%;background:var(--bg3);color:var(--tx3);font-size:15px;line-height:1;flex:0 0 auto}.ctacc .ctx:hover{background:var(--dn-bg);color:var(--dn)}
 /* ===== СВЕТЛАЯ ТЕМА ===== */
 body.light{--bg:#f2f2f7;--bg2:#ffffff;--bg3:#e9e9ee;--line:#dcdce1;--tx:#1c1c1e;--tx2:#6e6e73;--tx3:#8e8e93;
   --up:#1f9d45;--up-bg:rgba(52,199,89,.14);--dn:#e5302a;--dn-bg:rgba(255,59,48,.12);--acc:#007aff;--acc2:#0a84ff;--warn:#c77700;color-scheme:light}
@@ -1330,7 +1331,7 @@ body.light .thsw{background:#e9e9ee}body.light .thsw span{color:#6e6e73}body.lig
             <div>
               <div class="fgtitle" style="margin-bottom:6px">2. Счета</div>
               <div class="row" style="gap:6px;margin-bottom:10px">
-                <button class="btn sm" onclick="ctLoadAccounts()">Загрузить счета</button>
+                <button class="btn sm" onclick="ctLoadAccounts()" title="Получить из cTrader актуальный список счетов">Обновить список</button>
                 <button class="btn sm pri ctSyncBtn" onclick="ctSync()">⟳ Синхронизировать</button>
                 <button class="btn sm ctSyncBtn" onclick="ctRecheck()" title="Заново прочитать стопы, тейки и причину закрытия у всех сделок">Перепроверить SL/TP</button>
               </div>
@@ -5457,7 +5458,7 @@ function ctConnect() {
 }
 async function ctDisconnect() {
   if (!confirm('Отключить cTrader? Загруженные сделки останутся в дневнике.')) return;
-  const c = CT.conn; CT.conn = ''; CT.connected = false; saveCT(); markDirty();
+  const c = CT.conn; CT.conn = ''; CT.connected = false; CT.accounts = []; CT.links = {}; CT.hidden = []; saveCT(); markDirty();   // без подключения список счетов не нужен
   try { await ctSrvCall('/api/disconnect', { conn: c }, 15000); } catch (e) {}
   if (SY.gSess) ctSrvCall('/g/ctset', { session: SY.gSess, conn: '' }, 15000).catch(() => {});
   fillCT(); ctStatus('cTrader отключён. Доступ можно также отозвать в cTrader ID → Settings → Open API.');
@@ -5552,7 +5553,9 @@ async function ctLoadAccounts() {
     const r = await c.send(CT_PT.ACCOUNTS_BY_TOKEN, { accessToken: tk.accessToken });
     const list = (r.ctidTraderAccount || []).map(a => ({ ctid: String(a.ctidTraderAccountId), login: a.traderLogin ? String(a.traderLogin) : '', broker: a.brokerTitleShort || '', live: a.isLive !== false }));
     if (r.permissionScope && /TRADE/i.test(String(r.permissionScope))) toast('Внимание: выдан доступ с торговлей. Дневнику нужен только просмотр — можно переподключить с правами «accounts»');
-    CT.accounts = list; saveCT(); fillCT();
+    CT.accounts = list; CT.hidden = [];                         // список — как сейчас в cTrader; убранные вручную возвращаются
+    Object.keys(CT.links || {}).forEach(k => { if (!list.some(a => a.ctid === k)) delete CT.links[k]; });
+    saveCT(); fillCT();
     ctStatus(list.length ? '<span class="up">Счетов в cTrader: ' + list.length + '.</span> Привяжи каждый к счёту дневника и нажми «Синхронизировать».'
       : '<span class="warn">cTrader не вернул ни одного счёта. При выдаче доступа нужно отметить счета галочками.</span>');
   } catch (e) { ctStatus('<span class="dn">Не получилось: ' + esc(e.message || e) + '</span>'); }
@@ -5953,6 +5956,11 @@ function ctReconHtml(ctid) {
     '<div class="mut">Если «Загрузить всю историю» не помогает, остаток — разница стартового депозита: нажми «Подогнать депозит».</div>' +
     '<div class="row" style="gap:6px;margin-top:6px"><button class="btn sm" onclick="ctReloadAll()">Загрузить всю историю</button><button class="btn sm" onclick="ctFit(\'' + ctid + '\')">Подогнать депозит</button></div></div>';
 }
+function ctHide(ctid) {
+  const a = CT.accounts.find(x => x.ctid === ctid) || {};
+  if (!confirm('Убрать счёт ' + (a.login || ctid) + ' из списка?\n\nСделки, уже загруженные в дневник, останутся. Новые с этого счёта загружаться не будут.\nВернуть — кнопкой «Обновить список».')) return;
+  CT.hidden = (CT.hidden || []).concat([ctid]); delete CT.links[ctid]; saveCT(); fillCT();
+}
 function fillCT() {
   const box = $('#ctAccs'); if (!box) return;
   const cb = $('#ctConnBox');
@@ -5966,10 +5974,11 @@ function fillCT() {
   if ($('#ctFrom')) $('#ctFrom').value = CT.from || dOnly(Date.now() - 90 * 864e5);
   if ($('#ctFromStart')) { $('#ctFromStart').checked = CT.fromStart !== false; $('#ctFromBox').style.display = CT.fromStart !== false ? 'none' : ''; }
   const opts = v => '<option value="">не загружать</option>' + liveAccs().map(a => '<option value="' + a.id + '"' + (a.id === v ? ' selected' : '') + '>в «' + esc(a.name) + '»</option>').join('') + '<option value="__new">+ создать новый счёт</option>';
-  box.innerHTML = CT.accounts.length ? CT.accounts.map(a => '<div class="ctacc"><div><b>' + esc(a.login || a.ctid) + '</b> <span class="pill ' + (a.live ? 'b' : '') + '">' + (a.live ? 'реальный' : 'демо') + '</span>' +
+  const ctOn = !!CT.conn || (!!CT.connected && gdReady()), shown = ctOn ? CT.accounts.filter(a => !(CT.hidden || []).includes(a.ctid)) : [];
+  box.innerHTML = shown.length ? shown.map(a => '<div class="ctacc"><button class="ctx" title="Убрать из списка — сделки этого счёта не загружаются" onclick="ctHide(\'' + a.ctid + '\')">×</button><div><b>' + esc(a.login || a.ctid) + '</b> <span class="pill ' + (a.live ? 'b' : '') + '">' + (a.live ? 'реальный' : 'демо') + '</span>' +
     '<div class="mut" style="font-size:11.5px">' + esc(a.broker || 'cTrader') + (CT.last[a.ctid] ? ' · синхр. ' + dt(ctWall(CT.last[a.ctid])) : '') + '</div></div>' +
     '<select onchange="ctLink(\'' + a.ctid + '\', this.value)">' + opts(CT.links[a.ctid]) + '</select>' + ctReconHtml(a.ctid) + '</div>').join('')
-    : '<div class="mut" style="font-size:12px">Счета появятся после шага 3.</div>';
+    : '<div class="mut" style="font-size:12px">' + (!ctOn ? 'Подключи cTrader — здесь появятся счета, к которым ты дашь доступ.' : CT.accounts.length ? 'Все счета убраны из списка. «Обновить список» вернёт их.' : 'Нажми «Обновить список», чтобы получить счета из cTrader.') + '</div>';
   const linked = Object.keys(CT.links).filter(k => accById(CT.links[k])).length;
   $$('.ctSyncBtn').forEach(b => b.style.display = linked ? '' : 'none');
   const im = $('#ctImpCard'); if (im) im.style.display = '';
