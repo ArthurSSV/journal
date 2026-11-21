@@ -159,6 +159,25 @@ tbody tr{cursor:pointer}
   .calbox{min-height:0}
 }
 canvas{display:block;width:100%}
+.kq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.kq{background:#1a2029;border-radius:14px;padding:14px 16px 12px;position:relative;min-width:0}
+.kq-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}
+.kq-t{font-size:14px;font-weight:600;color:#d8dee6;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.kq-i{width:22px;height:22px;border-radius:50%;border:1.5px solid #9aa7b5;color:#c3cdd8;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+.kq-per{cursor:pointer;color:#a3a8b0;font-size:13px;user-select:none;white-space:nowrap;outline:none}
+.kq-per:hover{color:#d8dee6}.kq-per .kq-ch{display:inline-block;font-size:12px;transition:transform .15s}.kq-per.open .kq-ch{transform:rotate(180deg)}
+.kq-menu{position:absolute;right:12px;top:40px;background:#262c34;border-radius:10px;padding:4px;z-index:20;display:none;min-width:130px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.kq-menu.on{display:block}
+.kq-mi{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:7px;font-size:13px;color:#a3a8b0;cursor:pointer;user-select:none}
+.kq-mi:hover{background:#30373f;color:#fff}.kq-mi span{color:#3fc184;visibility:hidden}.kq-mi.sel{color:#fff}.kq-mi.sel span{visibility:visible}
+.kq-v{font-size:32px;font-weight:600;letter-spacing:-.6px;line-height:1;margin-bottom:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kq-b{display:grid;grid-template-columns:minmax(0,1fr) 44%;gap:8px;align-items:end}
+.kq-d{font-size:13px;line-height:1.55;min-width:0}
+.kq-c{display:block;font-size:12.5px;font-weight:600}.kq-m{display:block;color:#a3a8b0}.kq-x{display:block;margin-top:2px;color:#d8dee6}
+.kq-s{width:100%;height:48px;display:block}
+.kq-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}
+.kq-sm{background:#1a2029;border-radius:10px;padding:9px 12px}.kq-sm span{display:block;font-size:12px;color:#a3a8b0}.kq-sm b{font-size:16px;font-weight:600}
+@media(max-width:560px){.kq-grid{grid-template-columns:1fr}.kq-v{font-size:28px}.kq-row{grid-template-columns:repeat(2,1fr)}}
 .dscpill{margin:10px 12px 0;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line);font-size:11.5px;line-height:1.35}
 .dscpill b{display:block;font-size:13px}.dscpill span{color:var(--tx2);display:block}
 .dscpill.ok{background:var(--up-bg);border-color:transparent}.dscpill.ok b{color:var(--up)}
@@ -627,7 +646,7 @@ canvas{cursor:crosshair}
           <button class="btn pri" onclick="openTrade()">+ Сделка</button>
         </div>
       </div>
-      <div class="kpis" id="kpis"></div>
+      <div id="kpis" style="margin-bottom:16px"></div>
       <div class="dashtop">
       <div class="grid" style="grid-template-columns:1fr;gap:12px;align-content:start">
         <div class="chartbox" id="liveCard" style="display:none">
@@ -1696,6 +1715,85 @@ function stats(arr) {
 }
 
 /* ---------------- render: dashboard ---------------- */
+/* ---------- карточки показателей дашборда: период в каждой карточке, мини-график ---------- */
+const LS_KPI = 'fxj.kpi.v1';
+let KPIP = { pnl: '30', wr: '30', dd: '30' };
+try { Object.assign(KPIP, JSON.parse(localStorage.getItem(LS_KPI)) || {}); } catch (e) {}
+const KPI_OPT = [['7', '7 дней'], ['30', '30 дней'], ['all', 'Всё время']];
+const KPI_PREV = { 7: 'к прошлым 7 дням', 30: 'к прошлым 30 дням' };
+function kpiWin(p) {                                  // сделки окна и предыдущего окна той же длины
+  const tsOf = t => { const v = new Date(t.closeTime || t.openTime || 0).getTime(); return isNaN(v) ? 0 : v; };
+  const all = TR.filter(t => tsOf(t) > 0).sort((a, b) => tsOf(a) - tsOf(b));
+  if (p === 'all') return { cur: all, prev: null, before: 0 };
+  const anchor = Math.max(Date.now(), all.length ? tsOf(all[all.length - 1]) : 0), len = (+p) * 864e5;
+  const cur = all.filter(t => tsOf(t) >= anchor - len), prev = all.filter(t => tsOf(t) >= anchor - 2 * len && tsOf(t) < anchor - len);
+  const before = all.filter(t => tsOf(t) < anchor - len).reduce((s, t) => s + (+t.net || 0), 0);
+  return { cur, prev, before };
+}
+function kpiSpark(arr, col) {
+  if (!arr || arr.length < 2) return '<svg class="kq-s" viewBox="0 0 100 40" preserveAspectRatio="none"></svg>';
+  const mn = Math.min(...arr), mx = Math.max(...arr), k = mx - mn || 1, id = 'kg' + Math.random().toString(36).slice(2, 8);
+  const d = 'M' + arr.map((v, i) => (i / (arr.length - 1) * 100).toFixed(1) + ' ' + (37 - (v - mn) / k * 32).toFixed(1)).join(' L');
+  return '<svg class="kq-s" viewBox="0 0 100 40" preserveAspectRatio="none"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity=".42"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="' + d + ' L100 40 L0 40 Z" fill="url(#' + id + ')"/><path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
+}
+function kpiPer(key) {
+  const cur = KPIP[key] || '30', lab = (KPI_OPT.find(o => o[0] === cur) || KPI_OPT[1])[1];
+  return '<span class="kq-per" role="button" tabindex="0" onclick="kpiMenu(event,\'' + key + '\')">' + lab + ' <span class="kq-ch">⌄</span></span>' +
+    '<div class="kq-menu" id="kqm_' + key + '">' + KPI_OPT.map(o => '<div class="kq-mi' + (o[0] === cur ? ' sel' : '') + '" onclick="kpiSet(event,\'' + key + '\',\'' + o[0] + '\')">' + o[1] + '<span>✓</span></div>').join('') + '</div>';
+}
+function kpiMenu(e, key) {
+  e.stopPropagation();
+  const m = $('#kqm_' + key), open = !m.classList.contains('on');
+  $$('.kq-menu').forEach(x => x.classList.remove('on')); $$('.kq-per').forEach(x => x.classList.remove('open'));
+  if (open) { m.classList.add('on'); e.currentTarget.classList.add('open'); }
+}
+function kpiSet(e, key, v) { e.stopPropagation(); KPIP[key] = v; localStorage.setItem(LS_KPI, JSON.stringify(KPIP)); renderKpis(); }
+document.addEventListener('click', () => { $$('.kq-menu').forEach(x => x.classList.remove('on')); $$('.kq-per').forEach(x => x.classList.remove('open')); });
+function kpiCard(key, icon, title, valHtml, valCls, lines, spark, per) {
+  return '<div class="kq"><div class="kq-h"><span class="kq-t"><span class="kq-i">' + icon + '</span>' + title + '</span>' + (per ? kpiPer(key) : '') + '</div>' +
+    '<div class="kq-v ' + valCls + '">' + valHtml + '</div><div class="kq-b"><div class="kq-d">' + lines + '</div>' + spark + '</div></div>';
+}
+function renderKpis() {
+  const box = $('#kpis'); if (!box) return;
+  const cur = S.currency === 'USD' ? '$' : S.currency, m = v => (v > 0 ? '+' : v < 0 ? '−' : '') + nf(Math.abs(v)) + ' ' + cur;
+  const todayK = (() => { const n = new Date(); return n.getFullYear() + '-' + P2(n.getMonth() + 1) + '-' + P2(n.getDate()); })();
+  const today = TR.filter(t => dOnly(t.closeTime || t.openTime) === todayK).reduce((s, t) => s + (+t.net || 0), 0);
+  const prevTxt = p => KPI_PREV[p] || 'за всё время';
+  // 1. Чистый P&L
+  let w = kpiWin(KPIP.pnl), s1 = stats(w.cur), c1 = '';
+  if (w.prev && w.prev.length) { const pn = w.prev.reduce((s, t) => s + (+t.net || 0), 0), d = s1.net - pn; c1 = '<span class="kq-c ' + cls(d) + '">' + (d >= 0 ? '▲ +' : '▼ −') + nf(Math.abs(d)) + ' ' + cur + '</span><span class="kq-m">' + prevTxt(KPIP.pnl) + '</span>'; }
+  else c1 = '<span class="kq-c ' + cls(s1.net) + '">' + (S.balance ? (s1.net >= 0 ? '▲ ' : '▼ ') + pctTxt(s1.net / S.balance * 100) : '') + '</span><span class="kq-m">от депозита · ' + nTrades(s1.n) + '</span>';
+  let acc = 0; const sp1 = w.cur.map(t => acc += (+t.net || 0));
+  const k1 = kpiCard('pnl', '$', 'Чистый P&amp;L', s1.n ? m(s1.net) : '—', cls(s1.net), c1 + '<span class="kq-x">Сегодня: <span class="' + cls(today) + '">' + m(today) + '</span></span>', kpiSpark([0].concat(sp1), '#3fc184'), true);
+  // 2. Винрейт
+  w = kpiWin(KPIP.wr); const s2 = stats(w.cur); let c2;
+  if (w.prev && w.prev.length) { const pw = w.prev.filter(t => t.net > 0).length / w.prev.length * 100, d = s2.wr - pw; c2 = '<span class="kq-c ' + cls(d) + '">' + (d >= 0 ? '▲ +' : '▼ −') + nf(Math.abs(d), 1) + ' п.</span><span class="kq-m">' + prevTxt(KPIP.wr) + '</span>'; }
+  else c2 = '<span class="kq-c">' + nTrades(s2.n) + '</span><span class="kq-m">' + (KPIP.wr === 'all' ? 'за всё время' : 'раньше сделок не было') + '</span>';
+  let wn = 0; const sp2 = w.cur.map((t, i) => { if (t.net > 0) wn++; return wn / (i + 1) * 100; });
+  const k2 = kpiCard('wr', '◎', 'Винрейт', s2.n ? nf(s2.wr, 1) + '%' : '—', '', c2 + '<span class="kq-x"><span class="up">' + s2.wins + ' плюс</span> / <span class="dn">' + s2.losses + ' минус</span></span>', kpiSpark(sp2.slice(Math.min(3, Math.max(0, sp2.length - 2))), '#f0a05a'), true);
+  // 3. Макс. просадка (в окне, от пика капитала)
+  w = kpiWin(KPIP.dd); let eq = (+S.balance || 0) + w.before, peak = eq, mdd = 0; const sp3 = [0];
+  w.cur.forEach(t => { eq += +t.net || 0; peak = Math.max(peak, eq); mdd = Math.max(mdd, peak - eq); sp3.push(eq - peak); });
+  const byDay = {}; w.cur.forEach(t => { const k = dOnly(t.closeTime || t.openTime); byDay[k] = (byDay[k] || 0) + (+t.net || 0); });
+  const lim = +S.ddLimit || 2, over = Object.values(byDay).filter(v => S.balance && v / S.balance * 100 <= -lim).length;
+  const mddPct = S.balance ? mdd / S.balance * 100 : 0;
+  const k3 = kpiCard('dd', '↘', 'Макс. просадка', w.cur.length ? (mdd > 0 ? '−' : '') + nf(mddPct, 1) + '%' : '—', mdd > 0 ? 'dn' : '',
+    '<span class="kq-c ' + (mdd > 0 ? 'dn' : '') + '">' + (mdd > 0 ? '−' : '') + nf(mdd) + ' ' + cur + '</span><span class="kq-m">от пика капитала</span><span class="kq-x">Лимит дня ' + nf(lim, 1) + '% · за лимитом: <span class="' + (over ? 'dn' : 'up') + '">' + over + '</span></span>',
+    kpiSpark(sp3, '#f0717d'), true);
+  // 4. Profit factor — за период дашборда
+  const arr = periodTrades(), st = stats(arr);
+  let gp = 0, gl = 0; const sp4 = [];
+  arr.slice().sort((a, b) => tTime(a) - tTime(b)).forEach(t => { const v = +t.net || 0; if (v > 0) gp += v; else gl -= v; if (gl > 0) sp4.push(Math.min(gp / gl, 5)); });
+  const k4 = kpiCard('pf', '⚖', 'Profit factor', st.n ? (st.pf === Infinity ? '∞' : nf(st.pf)) : '—', st.pf >= 1.5 ? 'up' : st.pf < 1 && st.n ? 'dn' : '',
+    '<span class="kq-c ' + cls(st.exp) + '">' + (st.n ? m(st.exp) : '—') + '</span><span class="kq-m">матожидание на сделку</span><span class="kq-x">Средний R: <span class="' + (st.avgR > 0 ? 'up' : st.avgR < 0 ? 'dn' : '') + '">' + (st.avgR === null ? '—' : nf(st.avgR) + 'R') + '</span></span>',
+    kpiSpark(sp4, '#9d95ee'), false);
+  const days = new Set(arr.map(t => dOnly(t.closeTime || t.openTime))).size;
+  box.innerHTML = '<div class="kq-grid">' + k1 + k2 + k3 + k4 + '</div><div class="kq-row">' +
+    [['Серии', st.bw + ' / ' + st.bl, '', 'побед / поражений подряд'], ['Ср. прибыль', st.n ? '+' + nf(st.avgW) : '—', 'up', ''], ['Ср. убыток', st.n ? '−' + nf(st.avgL) : '—', 'dn', ''],
+     ['Лучшая / худшая', st.n ? '<span class="up">+' + nf(st.best) + '</span> / <span class="dn">' + (st.worst < 0 ? '−' : '') + nf(Math.abs(st.worst)) + '</span>' : '—', '', ''], ['Торговых дней', String(days), '', '']]
+      .map(x => '<div class="kq-sm"' + (x[3] ? ' title="' + x[3] + '"' : '') + '><span>' + x[0] + '</span><b class="' + x[2] + '">' + x[1] + '</b></div>').join('') + '</div>';
+}
 function renderDash() {
   const arr = periodTrades(), st = stats(arr);
   if (arr.length) {
@@ -1707,17 +1805,7 @@ function renderDash() {
       ? 'За выбранный период сделок нет. Всего в дневнике: ' + TR.length + ' — переключи на «Всё время»'
       : 'Пока нет сделок — импортируй CSV или добавь вручную';
   }
-  const K = [
-    ['Чистый P&L', money(st.net), cls(st.net), (S.balance ? pctTxt(st.net / S.balance * 100) + ' от депозита · ' : '') + st.n + ' сделок'],
-    ['Винрейт', nf(st.wr, 1) + '%', st.wr >= 50 ? 'up' : '', st.wins + 'W / ' + st.losses + 'L'],
-    ['Profit factor', st.pf === Infinity ? '∞' : nf(st.pf), st.pf >= 1.5 ? 'up' : st.pf < 1 ? 'dn' : '', 'прибыль / убыток'],
-    ['Матожидание', money(st.exp), cls(st.exp), 'на сделку'],
-    ['Средний R', st.avgR === null ? '—' : nf(st.avgR) + 'R', st.avgR > 0 ? 'up' : st.avgR < 0 ? 'dn' : '', 'риск ' + nf(S.risk, 1) + '% депо'],
-    ['Макс. просадка', nf(st.mdd) + ' ' + S.currency, 'dn', nf(st.mddPct, 1) + '% депозита'],
-    ['Средняя прибыль', nf(st.avgW), 'up', 'убыток ' + nf(st.avgL)],
-    ['Серии', st.bw + ' / ' + st.bl, '', 'побед / поражений подряд']
-  ];
-  $('#kpis').innerHTML = K.map(k => '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v ' + k[2] + '">' + k[1] + '</div><div class="x">' + k[3] + '</div></div>').join('');
+  renderKpis();
   renderCal();
   equityChart(st.curve);
   dailyChart(arr);
