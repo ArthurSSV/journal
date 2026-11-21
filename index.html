@@ -8962,12 +8962,14 @@ function stSummary(mentor) {
     row('10 · Проп', esc(ST.propPlan)) +
     row('Цель месяца', g.rMonth ? '<b>+' + g.rMonth + 'R</b> · процесс: ' + ['rules', 'passport', 'review'].filter(x => (g.proc || {})[x] !== false).length + ' из 3 · вывод ' + (wd.pct || 0) + '% ' + (WDW[wd.when] || '') : '') +
     '</div>' +
-    (mentor ? '' : '<div class="row" style="margin-top:14px;align-items:center"><button class="btn pri" onclick="stCopy()">Скопировать для куратора</button>' +
+    (mentor ? '' : '<div class="field" style="margin-top:14px;max-width:360px"><label>Имя ученика — для PDF</label><input data-st="student" value="' + esc(ST.student || PROF.name || '') + '" placeholder="Имя Фамилия"></div>' +
+      '<div class="row" style="margin-top:4px;align-items:center"><button class="btn pri" onclick="stPdf()">Скачать PDF для куратора</button><button class="btn" onclick="stCopy()">Скопировать текстом</button>' +
       (ST.sentAt ? '<span class="st-sent">✓ Скопировано ' + dt(new Date(ST.sentAt).toISOString()) + '</span>' : '<span class="mut" style="font-size:12.5px">вставь текст в форму на платформе или отправь куратору</span>') + '</div>');
 }
 function renderStart() {
   const box = $('#stBody'); if (!box) return;
-  $('#stSteps').innerHTML = ST_STEPS.map((s, i) => '<span role="button" class="st-s' + (i === STEP ? ' on' : '') + (i < STEP ? ' dn' : '') + '" onclick="stGo(' + i + ')"><i>' + (i < STEP ? '✓' : i + 1) + '</i><span>' + s + '</span></span>').join('');
+  const ck = stChecks().map(c => c[1]), SD = [[6], [0, 1, 2], [3], [4, 5], [7, 8], [9], []].map(ix => ix.length && ix.every(j => ck[j]) && (ix[0] !== 6 || !!(ST.why && ST.zero)));
+  $('#stSteps').innerHTML = ST_STEPS.map((s, i) => '<span role="button" class="st-s' + (i === STEP ? ' on' : '') + (SD[i] ? ' dn' : i < STEP ? ' td' : '') + '" onclick="stGo(' + i + ')"><i>' + (SD[i] && i !== STEP ? '✓' : i + 1) + '</i><span>' + s + '</span></span>').join('');
   box.innerHTML = stStepHtml();
   $('#stNav').innerHTML = (STEP > 0 ? '<button class="btn" onclick="stGo(' + (STEP - 1) + ')">← Назад</button>' : '<span></span>') +
     '<span class="mut" style="font-size:12.5px">Шаг ' + (STEP + 1) + ' из ' + ST_STEPS.length + ' · сохраняется само</span>' +
@@ -9003,6 +9005,42 @@ function stText() {
 function stCopy() {
   const t = stText(), done = () => { ST.sentAt = Date.now(); saveST(); renderStart(); toast('Текст для куратора скопирован'); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => stCopyFallback(t, done)); else stCopyFallback(t, done);
+}
+function stPdf() {
+  const k = stCalc(), t = stTest(), p = t.top && t.done === 10 ? PT[t.top] : null, ch = stChecks(), ok = ch.filter(c => c[1]).length, g = goalsOf(), wd = g.wd || {};
+  const name = (ST.student || PROF.name || '').trim(), today = new Date().toLocaleDateString('ru-RU'), C = ST.chart || {};
+  const WDW = { month: 'в конце месяца, если месяц в плюсе', payout: 'с каждой выплаты пропфирмы', quarter: 'раз в квартал' };
+  const v = x => x ? esc(x) : '<span class="mut">не заполнено</span>', m = x => nf(Math.round(x), 0) + ' $';
+  const row = (n, l, val) => '<tr><td class="n" style="width:22px;text-align:left">' + n + '</td><td style="width:34%"><b>' + l + '</b></td><td>' + val + '</td></tr>';
+  let h = '<div class="rpage"><div class="rhead"><div><div class="rt">Подготовка к старту · Модуль 0</div><div class="rs">Домашнее задание · клуб «Матрёшка»</div></div>' +
+    '<div class="rmeta">' + (name ? '<b>' + esc(name) + '</b><br>' : '') + 'Счёт: ' + esc(S.name) + '<br>' + today + '</div></div>' +
+    '<div class="rkpis"><div class="rk"><div class="rkk">Готовность</div><div class="rkv ' + (ok === ch.length ? 'g' : '') + '">' + ok + ' из ' + ch.length + '</div><div class="rkx">' + (ok === ch.length ? 'готово к зачёту' : 'есть пункты на доработку') + '</div></div>' +
+    '<div class="rk"><div class="rkk">1R · риск 0,3%</div><div class="rkv">' + (k.dep ? m(k.risk) : '—') + '</div><div class="rkx">депозит ' + (k.dep ? m(k.dep) : '—') + '</div></div>' +
+    '<div class="rk"><div class="rkk">Стоп дня −2%</div><div class="rkv r">' + (k.dep ? '−' + m(k.stop) : '—') + '</div><div class="rkx">цель сделки ≥ 3R = ' + (k.dep ? m(k.risk * 3) : '—') + '</div></div>' +
+    '<div class="rk"><div class="rkk">Психотип</div><div class="rkv">' + (p ? p.n : '—') + '</div><div class="rkx">' + (t.done ? 'А ' + t.c.A + ' · Б ' + t.c.B + ' · В ' + t.c.C : 'тест не пройден') + '</div></div></div>' +
+    '<div class="rh">Проверка перед отправкой</div><table class="rtab sm"><tbody>' + ch.map(c => '<tr><td style="width:22px" class="' + (c[1] ? 'g' : 'r') + '"><b>' + (c[1] ? '✓' : '✗') + '</b></td><td>' + c[0] + '</td></tr>').join('') + '</tbody></table>' +
+    '<div class="rh">Поля формы</div><table class="rtab"><tbody>' +
+    row(1, 'Зачем вам трейдинг', v(ST.why) + (ST.firstWhen ? '<br>Первые деньги: <b>' + esc(ST.firstWhen) + '</b> — ' + v(ST.firstWhy) : '')) +
+    row(2, 'Что изменится, если депозит уйдёт в ноль', v(ST.zero)) +
+    row(3, 'Три кошелька', k.exp ? 'Расходы на месяц: <b>' + m(k.exp) + '</b><br>Подушка: <b>' + m(k.cush) + '</b> — ' + nf(k.months, 1) + ' мес. расходов<br>Торговый капитал: <b>' + m(k.cap) + '</b><br>На депозит: <b>' + m(k.dep) + '</b> — ' + nf(k.share, 0) + '% капитала' : v('')) +
+    row(4, 'Риск на сделку и стоп дня в деньгах', k.dep ? '0,3% от депозита = <b>' + m(k.risk) + '</b><br>−2% = <b>−' + m(k.stop) + '</b>' : v('')) +
+    row(5, 'Часы у графика и окно', ST.hours ? esc(ST.hours) + ' ч в день · ' + v(ST.window) + (ST.daysOff ? '<br>Выпадают: ' + esc(ST.daysOff) : '') : v('')) +
+    row(6, 'Результат мини-теста', p ? 'А ' + t.c.A + ' · Б ' + t.c.B + ' · В ' + t.c.C + ' → <b>' + p.n + '</b><br><span class="mut">' + p.d + '</span>' : v('')) +
+    row(7, 'Где сломаю свои правила', ST.rule ? 'Правило: <b>' + esc(ST.rule) + '</b><br>Подпорка: ' + v(ST.prop) : v('')) +
+    row(8, 'График настроен', [['tf', 'XAUUSD, M1'], ['tz', 'московское время'], ['order', 'сначала ЗИ, сверху МВ']].map(x => (C[x[0]] ? '✓ ' : '✗ ') + x[1]).join(' · ') + '<br>Зон на сторону: ' + v(C.zonesN) + ' · оповещения: ' + v(C.alertsT)) +
+    row(9, 'Журнал', 'Дневник трейдера: дата, инструмент, сторона, объём, вход/выход, стоп, тейк, сетап, R, ошибки, скриншоты, разбор') +
+    row(10, 'Проп-счёт', v(ST.propPlan)) +
+    row('', 'Цель месяца', g.rMonth ? '<b>+' + g.rMonth + 'R</b> при не больше −2% за день<br>Процесс: ' + [['rules', 'без нарушений правил'], ['passport', 'паспорт до каждого входа'], ['review', 'разбор каждый день']].filter(x => (g.proc || {})[x[0]] !== false).map(x => x[1]).join(', ') + '<br>Вывод прибыли: ' + (wd.pct ? wd.pct + '% ' + (WDW[wd.when] || '') : v('')) : v('')) +
+    '</tbody></table>';
+  if (t.done) h += '<div class="rh">Ответы мини-теста</div><table class="rtab sm"><thead><tr><th style="width:22px">№</th><th>Вопрос</th><th>Ответ</th></tr></thead><tbody>' +
+    QZ.map((q, i) => { const a = (ST.test || [])[i], j = { A: 0, B: 1, C: 2 }[a]; return '<tr><td>' + (i + 1) + '</td><td>' + q[0] + '</td><td>' + (a ? '<b>' + 'АБВ'[j] + '</b> — ' + q[j + 1] : '<span class="mut">—</span>') + '</td></tr>'; }).join('') + '</tbody></table>';
+  h += '<div class="rfoot">Дневник трейдера · сформировано ' + new Date().toLocaleString('ru-RU') + (name ? ' · ' + esc(name) : '') + '</div></div>';
+  $('#report').innerHTML = h;
+  const old = document.title; document.title = 'Подготовка к старту' + (name ? ' — ' + name : '') + ' — ' + today;
+  const back = () => { document.title = old; window.removeEventListener('afterprint', back); };
+  window.addEventListener('afterprint', back); setTimeout(back, 60000);
+  toast('В окне печати выбери «Сохранить как PDF»');
+  setTimeout(() => window.print(), 300);
 }
 function stCopyFallback(t, done) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Не удалось скопировать'); } a.remove(); }
 
@@ -9071,7 +9109,7 @@ function goalsPlanFact(date) {
 .st-steps{display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .st-s{display:flex;align-items:center;gap:7px;padding:7px 12px 7px 7px;border-radius:20px;font-size:12.5px;color:var(--tx3);cursor:pointer;white-space:nowrap;flex:0 0 auto}
 .st-s i{font-style:normal;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--bg3);font-size:11.5px;font-weight:600;color:var(--tx2)}
-.st-s.on{background:var(--bg2);color:var(--tx)}.st-s.on i{background:var(--acc);color:#fff}.st-s.dn i{background:rgba(48,209,88,.18);color:#30d158}
+.st-s.td i{background:rgba(255,159,10,.18);color:#ff9f0a}.st-s.on{background:var(--bg2);color:var(--tx)}.st-s.on i{background:var(--acc);color:#fff}.st-s.dn i{background:rgba(48,209,88,.18);color:#30d158}
 #stBody h2{margin:0 0 4px}.st-lead{color:var(--tx3);font-size:13px;line-height:1.55;margin:0 0 16px;max-width:720px}
 .st-hint{font-size:11.5px;color:var(--tx3);margin-top:5px;line-height:1.5}
 .st-g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 12px}
