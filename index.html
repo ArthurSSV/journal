@@ -5663,6 +5663,7 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
     else { localStorage.setItem(TKEY(accId), JSON.stringify(existing.concat(fresh))); ACC_IDX = null; markDirty(); }
   }
   try { await ctCashFlow(c, ctid, accId, trader, report); } catch (e) { /* без истории денег — просто сверка */ }
+  try { ctBalanceChain(accId); } catch (e) {}
   const enr = await ctEnrich(c, ctid, accId, report);
   CT.last[ctid] = Date.now();
   if (trader.balance != null) { CT.bal = CT.bal || {}; CT.bal[ctid] = { bal: ctNum(trader.balance, trader.moneyDigits), at: Date.now() }; }
@@ -5692,6 +5693,35 @@ async function ctCashFlow(c, ctid, accId, trader, report) {
   const before = acc.cash.filter(x => x.ts <= t0), start = before.reduce((s, x) => s + x.delta, 0);
   if (before.length && start > 0) { acc.balance = Math.round(start * 100) / 100; acc.balSrc = 'cTrader'; }
   saveS();
+}
+/* Сверка по цепочке балансов cTrader. После каждой закрывающей сделки cTrader сообщает баланс счёта.
+   Разница двух соседних балансов (минус пополнения/выводы между ними) — это точный результат сделки
+   с комиссией за открытие и свопами, которые в истории сделок записаны отдельно. Дописываем эту разницу в сделку. */
+function ctBalanceChain(accId) {
+  const a = accById(accId); if (!a) return null;
+  const arr = ctExisting(accId), un = v => { try { return ctUnwall(v); } catch (e) { return Date.parse(v); } };
+  const list = arr.filter(t => t.closeTime).slice().sort((x, y) => (un(x.closeTime) - un(y.closeTime)) || ((+x.dealId || 0) - (+y.dealId || 0)));
+  const cash = (a.cash || []), lim = Math.max(50, (+a.balance || 0) * 0.005);
+  let prev = null, prevTs = -Infinity, n = 0, tot = 0, gaps = 0, lastBal = null, lastTs = null;
+  if (a.balSrc === 'cTrader' && list.length) {                                       // депозит взят из cTrader — первую сделку тоже сверяем
+    const t0 = Math.min(...arr.map(t => un(t.openTime || t.closeTime)).filter(v => !isNaN(v))); prev = +a.balance; prevTs = t0; }
+  list.forEach(t => {
+    const ts = un(t.closeTime);
+    if (t.balAfter == null || t.src !== 'ctrader') { prev = null; return; }          // CSV или без баланса — цепочку начинаем заново
+    if (prev !== null) {
+      const cb = cash.filter(x => x.ts > prevTs && x.ts <= ts).reduce((s2, x) => s2 + (+x.delta || 0), 0);
+      const d = Math.round((t.balAfter - prev - cb - (+t.net || 0)) * 100) / 100;
+      if (Math.abs(d) >= 0.01) {
+        if (Math.abs(d) <= lim) { t.net = Math.round(((+t.net || 0) + d) * 100) / 100; t.fees = Math.round(((+t.fees || 0) + d) * 100) / 100; n++; tot += d; }
+        else gaps++;                                                                      // между сделками что-то не загружено
+      }
+    }
+    prev = +t.balAfter; prevTs = ts; lastBal = prev; lastTs = ts;
+  });
+  if (n) { if (accId === S.id) { TR = arr; save(); } else { localStorage.setItem(TKEY(accId), JSON.stringify(arr)); ACC_IDX = null; markDirty(); } }
+  a.chain = { n: (a.chain && a.chain.n || 0) + n, tot: Math.round(((a.chain && a.chain.tot || 0) + tot) * 100) / 100, gaps, lastBal, lastTs, at: Date.now() };
+  saveS();
+  return a.chain;
 }
 /* движение денег после начала торговли (выводы, выплаты, доливки) */
 function cashAfter(a) {
@@ -5910,9 +5940,17 @@ function ctReconHtml(ctid) {
   const r = ctRecon(ctid); if (!r) return '';
   const ca = cashAfter(r.a), cs = ca.reduce((s, x) => s + x.delta, 0);
   const cash = ca.length ? ' · движение денег после старта: <b class="' + cls(cs) + '">' + (cs > 0 ? '+' : '') + nf(cs) + '</b> (' + ca.length + ')' : '';
-  if (Math.abs(r.diff) < 1) return '<div class="ctrec ok">✓ Капитал сходится с cTrader: ' + nf(r.bal) + cash + '</div>';
+  const ch = r.a.chain, fees = ch && ch.n ? '<div class="mut">Дописаны комиссии за открытие и свопы: ' + ch.n + ' ' + plural(ch.n, ['сделка', 'сделки', 'сделок']) + ', итого ' + (ch.tot > 0 ? '+' : '') + nf(ch.tot) + '</div>' : '';
+  if (Math.abs(r.diff) < 1) return '<div class="ctrec ok">✓ Капитал сходится с cTrader: ' + nf(r.bal) + cash + fees + '</div>';
+  // после последней закрытой сделки: остаток — это открытые сейчас позиции (комиссия и свопы уже списаны)
+  if (ch && ch.lastBal != null && !ch.gaps) {
+    const after = (r.a.cash || []).filter(x => x.ts > ch.lastTs).reduce((s2, x) => s2 + (+x.delta || 0), 0), open = Math.round((r.bal - ch.lastBal - after) * 100) / 100;
+    if (Math.abs(open - r.diff) < 1 && Math.abs(open) < Math.max(100, r.bal * 0.003))
+      return '<div class="ctrec ok">✓ Сделки сходятся с cTrader до копейки' + cash + fees + '<div class="mut">Разница ' + (open > 0 ? '+' : '') + nf(open) + ' — комиссия и свопы по открытым сейчас позициям. Уйдёт, когда позиции закроются.</div></div>';
+  }
   return '<div class="ctrec bad"><div>Дневник <b>' + nf(r.cap) + '</b> · cTrader <b>' + nf(r.bal) + '</b> · разница <b class="' + cls(r.diff) + '">' + (r.diff > 0 ? '+' : '') + nf(r.diff) + '</b>' + cash + '</div>' +
-    '<div class="mut">Обычно это ранняя история или выводы, которые не загружены. Сначала попробуй «Загрузить всю историю», если не сойдётся — подгони депозит.</div>' +
+    fees + (ch && ch.gaps ? '<div class="mut">Найдено разрывов в истории: ' + ch.gaps + ' — между некоторыми сделками в cTrader было что-то, чего нет в дневнике.</div>' : '') +
+    '<div class="mut">Если «Загрузить всю историю» не помогает, остаток — разница стартового депозита: нажми «Подогнать депозит».</div>' +
     '<div class="row" style="gap:6px;margin-top:6px"><button class="btn sm" onclick="ctReloadAll()">Загрузить всю историю</button><button class="btn sm" onclick="ctFit(\'' + ctid + '\')">Подогнать депозит</button></div></div>';
 }
 function fillCT() {
