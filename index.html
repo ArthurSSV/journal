@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Дневник трейдера · cTrader</title>
-<meta name="theme-color" content="#151b23">
+<meta name="theme-color" content="#1c1c1e">
 <meta name="description" content="Личный дневник трейдера: сделки cTrader, аналитика, журнал дня">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -589,6 +589,116 @@ canvas{cursor:crosshair}
 }
 /* сенсорные экраны: таблицы прокручиваются пальцем */
 .twrap{-webkit-overflow-scrolling:touch}
+/* ===== ОФОРМЛЕНИЕ В СТИЛЕ APPLE ===== */
+:root{--bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;--line:#38383a;--tx:#f5f5f7;--tx2:#a1a1a6;--tx3:#8e8e93;
+  --up:#30d158;--up-bg:rgba(48,209,88,.15);--dn:#ff453a;--dn-bg:rgba(255,69,58,.15);--acc:#0a84ff;--acc2:#64d2ff;--warn:#ff9f0a;--r:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Arial,sans-serif;letter-spacing:-.1px}
+h1{font-size:28px;font-weight:700;letter-spacing:-.5px}
+h2{font-weight:600}
+.sub{color:var(--tx3)}
+/* боковая панель */
+.side{background:#232325;border-right:1px solid var(--line)}
+.brand{border-bottom:0;padding:16px 16px 8px}.brand b{font-size:15px;font-weight:600}
+.accbox{border-bottom:0;padding:4px 10px 6px}.accbox label{display:none}
+#accSel{background:#323235;border:0;border-radius:10px;padding:9px 30px 9px 11px;font-weight:600;font-size:13.5px;appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 4.5L6 2l2.5 2.5M3.5 7.5L6 10l2.5-2.5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;background-size:12px}
+.accbox .btn.sm{border:0;background:#323235;border-radius:10px}
+#accInfo{padding-left:4px}
+.dscpill{margin:6px 10px 0;border:0;border-radius:10px}
+.nav{padding:6px 8px;overflow-y:auto}
+.nav .ngh{font-size:11px;color:var(--tx3);padding:12px 10px 4px;font-weight:500}
+.nav button{padding:7px 10px;border-radius:8px;font-size:13.5px;color:#e5e5ea;gap:10px}
+.nav button:hover{background:#2f2f32}
+.nav button.on{background:var(--acc);color:#fff}.nav button.on svg{stroke:#fff}
+.nav .ic{width:17px;display:flex;align-items:center;justify-content:center}.nav .ic svg{width:17px;height:17px}
+.live{margin:8px 10px;border:0;border-radius:12px;background:var(--bg2)}
+.sidefoot{border-top:0;color:var(--tx3)}
+/* карточки и панели */
+.card,.chartbox{background:var(--bg2);border:0;border-radius:16px}
+.kq,.kq-strip,.kq-sm{background:var(--bg2)}
+.kq-it{border-left-color:var(--bg3)}
+.kpi{background:var(--bg2);border:0;border-radius:16px}
+.note{background:var(--bg2);border-left:0;border-radius:12px;box-shadow:inset 3px 0 0 var(--acc)}
+/* кнопки и поля */
+.btn{background:#3a3a3c;border:0;border-radius:9px;font-weight:500}
+.btn:hover{background:#48484a}
+.btn.pri{background:var(--acc)}.btn.pri:hover{background:#2a93ff}
+input,select,textarea{background:#2c2c2e;border:1px solid #3a3a3c;border-radius:9px}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(10,132,255,.25)}
+.segm{border:0;background:#1c1c1e;border-radius:9px;padding:2px}
+.segm button{background:transparent;border-radius:7px;color:#e5e5ea;font-size:12px}
+.segm button.on{background:#636366;color:#fff}
+.pill{border:0;background:#3a3a3c}
+/* таблицы */
+th{background:var(--bg2);color:var(--tx3);text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;border-bottom:1px solid var(--line)}
+td{border-top:1px solid #333336}
+tr:hover td{background:rgba(255,255,255,.03)}
+/* календарь */
+.calbox{background:var(--bg2)}
+.calnav button{color:var(--acc);border-radius:50%}
+.calnav b{font-size:16px;font-weight:700}
+.calgrid{gap:5px}
+.calgrid .cdow{text-transform:uppercase;letter-spacing:.4px}
+.cday{background:#38383a;border-radius:12px;align-items:flex-start;padding:6px 7px}
+.cday .cn{width:24px;height:24px;line-height:24px;border-radius:50%;min-width:0;padding:0!important;color:#c7c7cc}
+.cday.w,.cday.l{border:0}
+.cday.w{background:rgba(48,209,88,.16)}.cday.l{background:rgba(255,69,58,.18)}.cday.z{background:#3a3a3c}
+.cday.w .cn{color:var(--up);border:0;font-weight:600}.cday.l .cn{color:var(--dn);border:0;font-weight:600}
+.cday.w .cv,.cday.l .cv,.cday.z .cv{background:transparent;text-align:left;padding:0 0 2px}
+.cday.w .cv{color:var(--up)}.cday.l .cv{color:var(--dn)}
+.cday .cv .n{color:var(--tx2);opacity:1}
+.cday.today{box-shadow:none}.cday.today .cn{background:var(--acc);color:#fff}
+.cday.has:hover{filter:brightness(1.15)}
+@media(max-width:820px){.nav .ngh{display:none}.nav{background:#232325;border-top:1px solid var(--line)}}
+/* модальные окна */
+.modal{border:0;border-radius:18px;background:#2c2c2e}
+.mhead,.mfoot{border-color:var(--line)}
+/* ===== СВЕТЛАЯ ТЕМА ===== */
+body.light{--bg:#f2f2f7;--bg2:#ffffff;--bg3:#e9e9ee;--line:#dcdce1;--tx:#1c1c1e;--tx2:#6e6e73;--tx3:#8e8e93;
+  --up:#1f9d45;--up-bg:rgba(52,199,89,.14);--dn:#e5302a;--dn-bg:rgba(255,59,48,.12);--acc:#007aff;--acc2:#0a84ff;--warn:#c77700;color-scheme:light}
+body.light{background:var(--bg);color:var(--tx)}
+body.light .side{background:#f6f6f8;border-right-color:#e0e0e5}
+body.light #accSel{background-color:#e9e9ee;color:#1c1c1e}
+body.light .accbox .btn.sm{background:#e9e9ee}
+body.light .nav button{color:#1c1c1e}
+body.light .nav button:hover{background:#e9e9ee}
+body.light .nav button.on{background:var(--acc);color:#fff}
+body.light .card,body.light .chartbox,body.light .kq,body.light .kq-strip,body.light .kq-sm,body.light .calbox,body.light .live,body.light .note{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05),0 0 0 1px rgba(0,0,0,.04)}
+body.light .note{box-shadow:inset 3px 0 0 var(--acc),0 1px 2px rgba(0,0,0,.05)}
+body.light .kq-t{color:#1c1c1e}body.light .kq-i{color:#6e6e73}
+body.light .kq-per{color:#8e8e93}body.light .kq-per:hover{color:#1c1c1e}
+body.light .kq-menu{background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.14),0 0 0 1px rgba(0,0,0,.06)}
+body.light .kq-mi{color:#3a3a3c}body.light .kq-mi:hover{background:#f2f2f7;color:#000}body.light .kq-mi.sel{color:#000}
+body.light .kq-m,body.light .kq-it .k,body.light .kq-it .s{color:#8e8e93}
+body.light .kq-x{color:#1c1c1e}
+body.light .kq-it{border-left-color:#ececf0}
+body.light .kq-bar{background:#e9e9ee}
+body.light .btn{background:#e9e9ee;color:#1c1c1e}body.light .btn:hover{background:#dcdce1}
+body.light .btn.pri{background:var(--acc);color:#fff}
+body.light input,body.light select,body.light textarea{background:#fff;border-color:#d1d1d6;color:#1c1c1e}
+body.light .segm{background:#e9e9ee}
+body.light .segm button{color:#1c1c1e}
+body.light .segm button.on{background:#fff;color:#000;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+body.light .pill{background:#e9e9ee}
+body.light th{background:#fff;border-bottom-color:#e5e5ea}
+body.light td{border-top-color:#ededf1}
+body.light tr:hover td{background:rgba(0,0,0,.025)}
+body.light .cday{background:#f2f2f7}
+body.light .cday .cn{color:#3a3a3c}
+body.light .cday.w{background:rgba(52,199,89,.15)}body.light .cday.l{background:rgba(255,59,48,.12)}body.light .cday.z{background:#e9e9ee}
+body.light .cday.w .cn{color:var(--up)}body.light .cday.l .cn{color:var(--dn)}
+body.light .cday.today .cn{background:var(--acc);color:#fff}
+body.light .modal{background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+body.light .tip{background:#fff;color:#1c1c1e;border-color:#dcdce1;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+body.light .dscpill.ok{background:rgba(52,199,89,.14)}
+body.light ::-webkit-scrollbar-thumb{background:#c7c7cc}
+@media(max-width:820px){body.light .nav{background:#f6f6f8;border-top-color:#e0e0e5}}
+/* переключатель темы */
+.thsw{margin:6px 10px 4px;display:flex;background:#1c1c1e;border-radius:9px;padding:2px}
+.thsw span{flex:1;text-align:center;font-size:11.5px;padding:4px 0;border-radius:7px;color:#a1a1a6;cursor:pointer;user-select:none}
+.thsw span.on{background:#636366;color:#fff}
+body.light .thsw{background:#e9e9ee}body.light .thsw span{color:#6e6e73}body.light .thsw span.on{background:#fff;color:#000;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 </style>
 </head>
 <body>
@@ -7809,6 +7919,65 @@ setTimeout(() => { dscApply(); dscPull(true); }, 1500);
 
 window.DSC_READY = true;
 setTimeout(() => (gMode() ? gToken().catch(() => {}) : Promise.resolve()).then(() => gdReady() ? Promise.resolve(gdPull(true)).catch(() => {}) : 0).then(() => { if (CT.auto !== false && Object.keys(CT.links || {}).length && ctReady()) ctSync(true); }), 1200);
+</script>
+<script>
+/* боковая панель по группам и линейные иконки */
+(function () {
+  const nav = document.getElementById('nav'); if (!nav) return;
+  const sv = (c, p) => '<svg viewBox="0 0 16 16" fill="none" stroke="' + c + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
+  const B = '#0a84ff', O = '#ff9f0a', G = '#8e8e93';
+  const IC = {
+    dash: sv(B, '<rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2"/>'),
+    trades: sv(B, '<path d="M3 4h10M3 8h10M3 12h10"/>'),
+    stats: sv(B, '<path d="M3 13V8M8 13V3M13 13V6"/>'),
+    disc: sv(B, '<circle cx="8" cy="8" r="5.5"/><path d="M5.5 8.2l1.8 1.8 3.3-3.5"/>'),
+    journal: sv(O, '<path d="M4 2.5h7a1.5 1.5 0 0 1 1.5 1.5v9.5H5.5A1.5 1.5 0 0 1 4 12z"/><path d="M6.5 6h4M6.5 8.5h4"/>'),
+    circ: sv(O, '<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/>'),
+    bt: sv(O, '<path d="M3 12.5A5.5 5.5 0 1 1 13 9.5"/><path d="M13 6.5v3h-3"/>'),
+    kb: sv(O, '<rect x="3" y="2.5" width="10" height="11" rx="1.5"/><path d="M6 6h4M6 9h4"/>'),
+    import: sv(G, '<path d="M8 2.5v8M5 7.5l3 3 3-3M3 13.5h10"/>'),
+    team: sv(G, '<circle cx="6" cy="6" r="2.2"/><path d="M2.5 13a3.5 3.5 0 0 1 7 0M11 4.5a2 2 0 0 1 0 4M12.5 13a3 3 0 0 0-1.5-2.6"/>'),
+    settings: sv(G, '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M3.6 12.4l1.2-1.2M11.2 4.8l1.2-1.2"/>')
+  };
+  const groups = [['Торговля', ['dash', 'trades', 'stats', 'disc']], ['Работа над собой', ['journal', 'circ', 'bt', 'kb']], ['Прочее', ['import', 'team', 'settings']]];
+  const btn = {}; Array.from(nav.querySelectorAll('button')).forEach(b => { btn[b.dataset.p] = b; const i = b.querySelector('.ic'); if (i && IC[b.dataset.p]) i.innerHTML = IC[b.dataset.p]; });
+  nav.innerHTML = '';
+  groups.forEach(([t, ids]) => { const h = document.createElement('div'); h.className = 'ngh'; h.textContent = t; nav.appendChild(h); ids.forEach(id => btn[id] && nav.appendChild(btn[id])); });
+  const live = document.getElementById('liveBox'), foot = document.getElementById('sideFoot');
+  if (live && foot) foot.parentNode.insertBefore(live, foot);
+})();
+
+</script>
+<script>
+/* переключатель темы «Тёмная / Светлая / Авто»; в светлой теме тёмные цвета графиков меняются на светлые */
+(function () {
+  const MAP = { '#232c38': '#e5e5ea', '#161b22': '#ffffff', '#30363d': '#d1d1d6', '#3d4b5c': '#c7c7cc', '#3d444d': '#d1d1d6', '#c9d1d9': '#3a3a3c', '#8b98a8': '#6e6e73', '#5c6a7a': '#8e8e93', '#8b949e': '#6e6e73' };
+  const P = window.CanvasRenderingContext2D ? CanvasRenderingContext2D.prototype : null;
+  if (P) ['fillStyle', 'strokeStyle'].forEach(k => {
+    const d = Object.getOwnPropertyDescriptor(P, k); if (!d || !d.set) return;
+    Object.defineProperty(P, k, { configurable: true, get: d.get, set(v) {
+      const light = document.body.classList.contains('light') && this.canvas && this.canvas.id && !/^(cTrade|hvC)$/.test(this.canvas.id);
+      d.set.call(this, light && typeof v === 'string' && MAP[v.toLowerCase()] ? MAP[v.toLowerCase()] : v);
+    } });
+  });
+  const KEY = 'fxj.theme';
+  let mode = 'dark'; try { mode = localStorage.getItem(KEY) || 'dark'; } catch (e) {}
+  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+  function apply(rerender) {
+    const light = mode === 'light' || (mode === 'auto' && mq && mq.matches);
+    document.body.classList.toggle('light', light);
+    const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.setAttribute('content', light ? '#f2f2f7' : '#1c1c1e');
+    document.querySelectorAll('.thsw span').forEach(s => s.classList.toggle('on', s.dataset.m === mode));
+    if (rerender && typeof renderAll === 'function') { try { renderAll(); go(currentPage); } catch (e) {} }
+  }
+  const sw = document.createElement('div'); sw.className = 'thsw';
+  sw.innerHTML = '<span data-m="dark">Тёмная</span><span data-m="light">Светлая</span><span data-m="auto">Авто</span>';
+  sw.onclick = e => { const s = e.target.closest('span'); if (!s) return; mode = s.dataset.m; try { localStorage.setItem(KEY, mode); } catch (x) {} apply(true); };
+  const foot = document.getElementById('sideFoot'); if (foot) foot.parentNode.insertBefore(sw, foot);
+  if (mq && mq.addEventListener) mq.addEventListener('change', () => { if (mode === 'auto') apply(true); });
+  apply(true);
+})();
+
 </script>
 </body>
 </html>
