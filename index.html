@@ -683,7 +683,8 @@ body.light .dl-tip{background:rgba(255,255,255,.98);border-color:#dcdce1;box-sha
 .al-lg span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.al-lg em{font-style:normal;color:var(--tx3);margin-left:auto;font-variant-numeric:tabular-nums}
 
 /* ===== телефон и узкие экраны ===== */
-html,body{overflow-x:hidden;max-width:100%}
+html,body{overflow-x:clip;max-width:100%}
+@supports not (overflow:clip){.main{overflow-x:hidden}}
 .main,.page{min-width:0}
 input[type=date],input[type=datetime-local]{min-width:0;max-width:100%;box-sizing:border-box}
 #tcards{display:none}
@@ -7545,6 +7546,7 @@ function jView(v) {
   if (v === 'help') renderHelp();
 }
 function go(p) {
+  const changed = currentPage !== p;
   currentPage = p;
   $$('.pwbox input').forEach(i => i.type = 'password'); $$('.pwbtn').forEach(b => b.classList.remove('on'));
   const pg = p;
@@ -7559,6 +7561,7 @@ function go(p) {
   if (p === 'kb') renderKB();
   if (p === 'journal') { renderJournal(); jView('help'); }   // вход в раздел всегда начинается с инструкции
   if (window.DSC_READY) { if (p === 'disc') { renderDisc(); dscPull(); } if (p === 'team') { renderTeam(false); renderTeam(); } dscGate(); }
+  if (changed) window.scrollTo(0, 0);              // новый раздел всегда открывается сверху
 }
 function refreshSelects() {
   const syms = [...new Set(TR.map(t => t.symbol))].sort();
