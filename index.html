@@ -370,6 +370,10 @@ canvas{display:block;width:100%}
 .accbox{padding:12px 14px;border-bottom:1px solid var(--line)}
 .accrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;background:var(--bg)}
 .accrow.on{border-color:var(--acc);background:rgba(59,130,246,.07)}
+.accarch{margin-top:6px}
+.accarch-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 4px;cursor:pointer;font-size:13px;font-weight:600;color:var(--tx2);user-select:none}
+.accarch-h:hover{color:var(--tx)}
+.accrow.arch{opacity:.92}.accrow.arch b{color:var(--tx2)}
 .fgroup{border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
 .fgtitle{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
 .chk{display:inline-flex;align-items:center;gap:7px;margin:0 16px 6px 0;font-size:13px;color:var(--tx);text-transform:none;letter-spacing:0;cursor:pointer}
@@ -1590,17 +1594,19 @@ function saveS() { localStorage.setItem(LS_ACC, JSON.stringify(ACC)); ACC_IDX = 
 /* ---------- сделки нескольких счетов ---------- */
 let ACC_IDX = null;                                      // id сделки → id счёта
 function accById(id) { return ACC.accounts.find(a => a.id === id); }
+/* архив: закрытые счета не участвуют в «Все счета», допуске, синхронизации и выборе счёта */
+const liveAccs = () => ACC.accounts.filter(a => !a.archived);
 function accTrades(id) { if (S && id === S.id) return TR; try { return JSON.parse(localStorage.getItem(TKEY(id))) || []; } catch (e) { return []; } }
 function accIdx() { if (!ACC_IDX) { ACC_IDX = {}; ACC.accounts.forEach(a => accTrades(a.id).forEach(t => ACC_IDX[t.id] = a.id)); } return ACC_IDX; }
 /* выбор счетов: 'all' — все, 'cur' — активный, массив id — выбранные */
 function accIdsOf(v) {
-  if (!v || v === 'all') return ACC.accounts.map(a => a.id);
+  if (!v || v === 'all') return liveAccs().map(a => a.id);
   if (v === 'cur') return [S.id];
-  const ok = (Array.isArray(v) ? v : []).filter(id => accById(id));
+  const ok = (Array.isArray(v) ? v : []).filter(id => accById(id) && !accById(id).archived);
   return ok.length ? ok : [S.id];
 }
 function accSelName(v) {
-  if (!v || v === 'all') return ACC.accounts.length > 1 ? 'все счета' : S.name;
+  if (!v || v === 'all') return liveAccs().length > 1 ? 'все счета' : S.name;
   if (v === 'cur') return 'активный счёт «' + S.name + '»';
   return accIdsOf(v).map(id => accById(id).name).join(', ');
 }
@@ -1612,12 +1618,12 @@ function tradesOn(date, ids) {
 function tradesOfAccs(ids) { const out = []; ids.forEach(id => accTrades(id).forEach(t => out.push(Object.assign({ _acc: id }, t)))); return out; }
 /* переключатель счетов: Все · Активный · отдельные счета */
 function accPickHtml(key, v) {
-  if (ACC.accounts.length < 2) return '';
+  if (liveAccs().length < 2) return '';
   const ids = accIdsOf(v), mode = !v || v === 'all' ? 'all' : v === 'cur' ? 'cur' : 'pick';
   return '<div class="accpick" data-ap="' + key + '"><span>Счета:</span>' +
     '<button type="button" data-m="all" class="' + (mode === 'all' ? 'on' : '') + '">Все</button>' +
     '<button type="button" data-m="cur" class="' + (mode === 'cur' ? 'on' : '') + '" title="Тот, что выбран в левом меню">Активный</button>' +
-    '<i></i>' + ACC.accounts.map(a => '<button type="button" data-a="' + a.id + '" class="ac ' + (mode === 'pick' && ids.includes(a.id) ? 'on' : '') + '">' + esc(a.name) + '</button>').join('') + '</div>';
+    '<i></i>' + liveAccs().map(a => '<button type="button" data-a="' + a.id + '" class="ac ' + (mode === 'pick' && ids.includes(a.id) ? 'on' : '') + '">' + esc(a.name) + '</button>').join('') + '</div>';
 }
 function accPickBind(key, get, set) {
   const box = document.querySelector('.accpick[data-ap="' + key + '"]'); if (!box) return;
@@ -1661,17 +1667,30 @@ function addAcc() {
 }
 function delAcc(id) {
   if (ACC.accounts.length < 2) return toast('Нельзя удалить единственный счёт');
+  if (!accById(id).archived && liveAccs().length < 2) return toast('Нельзя удалить последний рабочий счёт');
   const a = ACC.accounts.find(x => x.id === id);
   const st = accStats(a);
   if (!confirm('Удалить счёт «' + a.name + '» вместе с ' + st.n + ' сделками? Отменить будет нельзя.')) return;
   localStorage.removeItem(TKEY(id));
   ACC.accounts = ACC.accounts.filter(x => x.id !== id);
-  if (ACC.active === id) ACC.active = ACC.accounts[0].id;
+  if (ACC.active === id) ACC.active = (liveAccs()[0] || ACC.accounts[0]).id;
   saveS(); load(); renderAll(); toast('Счёт удалён');
 }
+function accSummary(a) {
+  const tr = accTrades(a.id).slice().sort((x, y) => tTime(x) - tTime(y));
+  let eq = +a.balance || 0, peak = eq, mdd = 0, net = 0;
+  tr.forEach(t => { const v = +t.net || 0; net += v; eq += v; peak = Math.max(peak, eq); mdd = Math.max(mdd, peak - eq); });
+  const ts = tr.map(tTime).filter(Boolean);
+  return { n: tr.length, net, pct: a.balance ? net / a.balance * 100 : 0, mddPct: a.balance ? mdd / a.balance * 100 : 0,
+    from: ts.length ? dFull(new Date(ts[0]).toISOString()) : '', to: ts.length ? dFull(new Date(ts[ts.length - 1]).toISOString()) : '' };
+}
+let accArchOpen = false;
 function renderAccounts() {
-  $('#accSel').innerHTML = ACC.accounts.map(a => '<option value="' + a.id + '"' + (a.id === ACC.active ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
-  const rows = ACC.accounts.map(a => {
+  const live = liveAccs(), arch = ACC.accounts.filter(a => a.archived);
+  const cur = accById(ACC.active);
+  $('#accSel').innerHTML = live.map(a => '<option value="' + a.id + '"' + (a.id === ACC.active ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('') +
+    (cur && cur.archived ? '<option value="' + cur.id + '" selected>' + esc(cur.name) + ' · архив</option>' : '');
+  const rows = live.map(a => {
     const st = accStats(a), on = a.id === ACC.active;
     return '<div class="accrow' + (on ? ' on' : '') + '">' +
       '<div style="min-width:0"><b>' + esc(a.name) + '</b>' + (on ? ' <span class="pill b">активный</span>' : '') +
@@ -1680,9 +1699,38 @@ function renderAccounts() {
       '<div class="row" style="gap:6px">' +
       (on ? '' : '<button class="btn sm" onclick="switchAcc(\'' + a.id + '\')">Открыть</button>') +
       '<button class="btn sm" onclick="renameAcc(\'' + a.id + '\')">Имя</button>' +
+      '<button class="btn sm" onclick="archiveAcc(\'' + a.id + '\')" title="Счёт закрыт: убрать из рабочих разделов, данные сохранятся">В архив</button>' +
       '<button class="btn sm dgr" onclick="delAcc(\'' + a.id + '\')">×</button></div></div>';
   }).join('');
-  $('#accList').innerHTML = rows;
+  const archHtml = arch.length ? '<div class="accarch"><div class="accarch-h" onclick="accArchOpen=!accArchOpen;renderAccounts()"><span>' + (accArchOpen ? '▾' : '▸') + ' Архив · ' + arch.length + ' ' + plural(arch.length, ['счёт', 'счёта', 'счетов']) + '</span>' +
+    '<span class="mut" style="font-size:11.5px">не учитываются во «Все счета», допуске и синхронизации</span></div>' +
+    (accArchOpen ? arch.map(a => {
+      const m = accSummary(a), on = a.id === ACC.active;
+      return '<div class="accrow arch' + (on ? ' on' : '') + '"><div style="min-width:0"><b>' + esc(a.name) + '</b> <span class="pill">архив</span>' + (on ? ' <span class="pill b">открыт</span>' : '') +
+        '<div class="mut" style="font-size:11.5px">' + (m.from ? m.from + ' — ' + m.to + ' · ' : '') + nTrades(m.n) + ' · итог <span class="' + cls(m.net) + '">' + (m.net > 0 ? '+' : '') + nf(m.net) + ' ' + a.currency + ' (' + (m.pct > 0 ? '+' : '') + nf(m.pct, 2) + '%)</span> · макс. просадка ' + nf(m.mddPct, 1) + '%</div>' +
+        (a.archived.note ? '<div style="font-size:12px;margin-top:3px">' + esc(a.archived.note) + '</div>' : '') +
+        '<div class="mut" style="font-size:11px;margin-top:2px">в архиве с ' + dFull(new Date(a.archived.at).toISOString()) + '</div></div>' +
+        '<div class="row" style="gap:6px">' + (on ? '' : '<button class="btn sm" onclick="switchAcc(\'' + a.id + '\')">Открыть</button>') +
+        '<button class="btn sm" onclick="unarchiveAcc(\'' + a.id + '\')">Вернуть</button>' +
+        '<button class="btn sm dgr" onclick="delAcc(\'' + a.id + '\')">×</button></div></div>';
+    }).join('') : '') + '</div>' : '';
+  $('#accList').innerHTML = rows + archHtml;
+}
+function archiveAcc(id) {
+  const a = accById(id); if (!a) return;
+  if (liveAccs().length < 2) return toast('Нужен хотя бы один рабочий счёт — сначала добавь новый');
+  const note = prompt('«' + a.name + '» уйдёт в архив: сделки, скриншоты и статистика сохранятся, но счёт пропадёт из рабочих разделов.\n\nИтог счёта (необязательно), например «челлендж провален» или «выплата получена»:', '');
+  if (note === null) return;
+  a.archived = { at: Date.now(), note: note.trim().slice(0, 200) };
+  if (typeof CT !== 'undefined') { Object.keys(CT.links || {}).forEach(k => { if (CT.links[k] === id) delete CT.links[k]; }); saveCT(); }
+  if (ACC.active === id) { ACC.active = liveAccs()[0].id; saveS(); load(); renderAll(); go(currentPage); }
+  else { saveS(); renderAll(); }
+  toast('«' + a.name + '» в архиве');
+}
+function unarchiveAcc(id) {
+  const a = accById(id); if (!a) return;
+  delete a.archived; saveS(); renderAll();
+  toast('«' + a.name + '» снова в работе. Привязку к cTrader можно вернуть в Настройки → cTrader');
 }
 function renameAcc(id) {
   const a = ACC.accounts.find(x => x.id === id);
@@ -1958,7 +2006,7 @@ let calY = null, calM = null, calAll = false;
 function calTrades() {
   if (!calAll) return TR.map(t => Object.assign({ _acc: S.name }, t));
   const out = [];
-  for (const a of ACC.accounts) {
+  for (const a of liveAccs()) {
     let tr = a.id === S.id ? TR : [];
     if (a.id !== S.id) { try { tr = JSON.parse(localStorage.getItem(TKEY(a.id))) || []; } catch (e) {} }
     tr.forEach(t => out.push(Object.assign({ _acc: a.name }, t)));
@@ -5419,7 +5467,7 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
 }
 async function ctSync(quiet) {
   if (ctBusy) return;
-  const links = Object.keys(CT.links).filter(k => accById(CT.links[k]));
+  const links = Object.keys(CT.links).filter(k => accById(CT.links[k]) && !accById(CT.links[k]).archived);
   if (!links.length) { if (!quiet) ctStatus('<span class="warn">Нет привязанных счетов.</span> Нажми «Загрузить счета» и выбери, в какой счёт дневника класть сделки.'); return; }
   if (!ctReady()) { if (!quiet) ctStatus('<span class="dn">Сначала нажми «Подключить cTrader»</span>'); return; }
   ctBusy = true; $$('.ctSyncBtn').forEach(b => b.disabled = true);
@@ -5613,7 +5661,7 @@ function fillCT() {
   if ($('#ctTz')) $('#ctTz').value = CT.tz == null ? 'auto' : String(CT.tz);
   if ($('#ctAuto')) $('#ctAuto').checked = CT.auto !== false;
   if ($('#ctFrom')) $('#ctFrom').value = CT.from || dOnly(Date.now() - 90 * 864e5);
-  const opts = v => '<option value="">не загружать</option>' + ACC.accounts.map(a => '<option value="' + a.id + '"' + (a.id === v ? ' selected' : '') + '>в «' + esc(a.name) + '»</option>').join('') + '<option value="__new">+ создать новый счёт</option>';
+  const opts = v => '<option value="">не загружать</option>' + liveAccs().map(a => '<option value="' + a.id + '"' + (a.id === v ? ' selected' : '') + '>в «' + esc(a.name) + '»</option>').join('') + '<option value="__new">+ создать новый счёт</option>';
   box.innerHTML = CT.accounts.length ? CT.accounts.map(a => '<div class="ctacc"><div><b>' + esc(a.login || a.ctid) + '</b> <span class="pill ' + (a.live ? 'b' : '') + '">' + (a.live ? 'реальный' : 'демо') + '</span>' +
     '<div class="mut" style="font-size:11.5px">' + esc(a.broker || 'cTrader') + (CT.last[a.ctid] ? ' · синхр. ' + dt(ctWall(CT.last[a.ctid])) : '') + '</div></div>' +
     '<select onchange="ctLink(\'' + a.ctid + '\', this.value)">' + opts(CT.links[a.ctid]) + '</select></div>').join('')
@@ -7345,7 +7393,7 @@ function refreshSelects() {
 function renderAll() {
   refreshSelects(); renderAccounts();
   const st = accStats(S);
-  $('#accInfo').innerHTML = nTrades(st.n) + ' · <span class="' + cls(st.net) + '">' + nf(st.eq) + ' ' + S.currency + '</span>';
+  $('#accInfo').innerHTML = (S.archived ? '<span class="pill" style="margin-right:4px">архив</span>' : '') + nTrades(st.n) + ' · <span class="' + cls(st.net) + '">' + nf(st.eq) + ' ' + S.currency + '</span>';
   renderDash(); renderTrades(); renderStats(); renderJournal(); renderCirc(); fillSettings();
   if (window.DSC_READY) dscApply();
 }
@@ -7645,7 +7693,7 @@ async function dscCall(path, body) { return ctSrvCall(path, Object.assign({ sess
 /* последний торговый день до сегодняшнего (по всем счетам) */
 function dscLastTradeDay(today) {
   let best = '';
-  ACC.accounts.forEach(a => accTrades(a.id).forEach(t => { const k = dOnly(t.closeTime || t.openTime); if (k < today && k > best && k !== 'NaN-NaN-NaN') best = k; }));
+  liveAccs().forEach(a => accTrades(a.id).forEach(t => { const k = dOnly(t.closeTime || t.openTime); if (k < today && k > best && k !== 'NaN-NaN-NaN') best = k; }));
   return best;
 }
 /* просадка дня по счёту: от баланса на начало дня, по закрытым сделкам */
@@ -7659,7 +7707,7 @@ function dscEval() {
   const today = dscToday(), cfg = dscCfg(), day = dscDay(today), now = Date.now();
   const res = { code: 'ok', text: 'Допуск есть', accs: [], today };
   if (!dscActive()) { res.code = 'off'; res.text = 'Режим допуска выключен'; return res; }
-  ACC.accounts.forEach(a => {
+  liveAccs().forEach(a => {
     const x = dscAccDay(a, today), re = (day.re || []).filter(r => r.acc === a.id), k = re.length;
     const thr = x.lim + (+cfg.reExtra || 1) * k, last = re[re.length - 1];
     let st = 'ok';
