@@ -1659,6 +1659,62 @@ body.light .thsw{background:#e9e9ee}body.light .thsw span{color:#6e6e73}body.lig
 <div class="toast" id="toast"></div>
 
 <script>
+/* Хранилище сделок: IndexedDB вместо localStorage (лимит ~5 МБ мал для счетов с тысячами сделок).
+   Сделки заранее читаются в память, остальной код работает с ними как раньше — через localStorage.getItem/setItem,
+   а запись уходит в IndexedDB. Старые данные из localStorage переносятся сами при первом запуске. */
+(function () {
+  const PFX = 'fxj.trades.', MEM = Object.create(null), pend = Object.create(null);
+  let db = null, timer = null, booted = false;
+  const SP = Storage.prototype, oGet = SP.getItem, oSet = SP.setItem, oRem = SP.removeItem;
+  const isT = (self, k) => { try { return self === window.localStorage && typeof k === 'string' && k.indexOf(PFX) === 0; } catch (e) { return false; } };
+  function flush() {
+    if (!db) return; const keys = Object.keys(pend); if (!keys.length) return;
+    try { const tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv'); keys.forEach(k => { const v = pend[k]; delete pend[k]; if (v === null) st.delete(k); else st.put(v, k); }); } catch (e) {}
+  }
+  const sched = () => { clearTimeout(timer); timer = setTimeout(flush, 300); };
+  function boot() {
+    if (booted) return;
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); return; }   // ждём, пока страница прочитана целиком
+    booted = true;
+    document.querySelectorAll('script[type="text/fxj"]').forEach(sc => { const n = document.createElement('script'); n.textContent = sc.textContent; sc.parentNode.insertBefore(n, sc.nextSibling); });
+  }
+  function patch() {
+    SP.getItem = function (k) { return isT(this, k) ? (k in MEM ? MEM[k] : null) : oGet.call(this, k); };
+    SP.setItem = function (k, v) { if (isT(this, k)) { MEM[k] = String(v); pend[k] = MEM[k]; sched(); return; } return oSet.call(this, k, v); };
+    SP.removeItem = function (k) { if (isT(this, k)) { delete MEM[k]; pend[k] = null; sched(); try { oRem.call(this, k); } catch (e) {} return; } return oRem.call(this, k); };
+    window.FXJ_STORE = { idb: true, bytes: () => Object.keys(MEM).reduce((s2, k) => s2 + MEM[k].length, 0), flush };
+  }
+  if (!window.indexedDB) return boot();
+  let req; try { req = indexedDB.open('fxjtrades', 1); } catch (e) { return boot(); }
+  req.onupgradeneeded = () => req.result.createObjectStore('kv');
+  req.onerror = () => boot();
+  req.onblocked = () => boot();
+  req.onsuccess = () => {
+    db = req.result;
+    try {
+      const tx = db.transaction('kv', 'readonly'), st = tx.objectStore('kv'), kr = st.getAllKeys(), vr = st.getAll();
+      tx.oncomplete = () => {
+        kr.result.forEach((k, i) => { MEM[k] = vr.result[i]; });
+        const old = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(PFX) === 0) old.push(k); }
+        old.forEach(k => { const v = oGet.call(localStorage, k); if (!(k in MEM) && v != null) MEM[k] = v; });
+        patch();
+        if (old.length) {                                   // перенос: сначала записали в IndexedDB, потом убрали из localStorage
+          const t2 = db.transaction('kv', 'readwrite'), s2 = t2.objectStore('kv');
+          old.forEach(k => { if (k in MEM) s2.put(MEM[k], k); });
+          t2.oncomplete = () => old.forEach(k => { try { oRem.call(localStorage, k); } catch (e) {} });
+        }
+        boot();
+      };
+      tx.onerror = () => boot();
+    } catch (e) { boot(); }
+  };
+  const fl = () => { clearTimeout(timer); flush(); };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) fl(); });
+  window.addEventListener('pagehide', fl);
+  setTimeout(boot, 8000);                                    // страховка: если база не ответила — запускаемся на localStorage
+})();
+</script>
+<script type="text/fxj">
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -5580,7 +5636,8 @@ function ctWall(ms) {   // время брокера → «настенное» 
 function ctNum(v, md) { return v == null ? null : +v / Math.pow(10, md == null ? 2 : +md); }
 function ctIsSell(s) { return s === 2 || s === 'SELL'; }
 async function ctDeals(c, ctid, from, to, out, report) {
-  const r = await c.send(CT_PT.DEALS, { ctidTraderAccountId: +ctid, fromTimestamp: from, toTimestamp: to, maxRows: 5000 }, 60000);
+  if (CT_STOP) return;
+  const r = await c.send(CT_PT.DEALS, { ctidTraderAccountId: +ctid, fromTimestamp: from, toTimestamp: to, maxRows: 1000 }, 60000);
   await ctSleep(250);                                       // лимит на исторические запросы — 5 в секунду
   if (r.hasMore && to - from > 3600000) {
     const mid = Math.floor((from + to) / 2);
@@ -5592,34 +5649,24 @@ async function ctDeals(c, ctid, from, to, out, report) {
 }
 function ctExisting(accId) { if (accId === S.id) return TR; try { return JSON.parse(localStorage.getItem(TKEY(accId))) || []; } catch (e) { return []; } }
 function ctFreshRows(rows, existing) {
+  const deals = new Set(existing.filter(t => t.dealId).map(t => String(t.dealId)));
+  const legacy = existing.filter(t => !t.dealId);                       // CSV и ручные — сверяем по позиции/времени
+  rows = rows.filter(t => !(t.dealId && deals.has(String(t.dealId))));
+  existing = legacy;
   const have = {}; existing.forEach(t => { const k = tradeSig(t); have[k] = (have[k] || 0) + 1; });
   const seen = {};
   return rows.filter(t => { const k = tradeSig(t); seen[k] = (seen[k] || 0) + 1; return seen[k] > (have[k] || 0); });
 }
-async function ctSyncAccount(c, tk, ctid, accId, report) {
-  const acc = accById(accId); if (!acc) return { added: 0 };
-  try { await c.send(CT_PT.ACC_AUTH, { ctidTraderAccountId: +ctid, accessToken: tk.accessToken }); }
-  catch (e) { if (!/ALREADY/i.test(e.code || e.message)) throw e; }
-  const trader = ((await c.send(CT_PT.TRADER, { ctidTraderAccountId: +ctid })) || {}).trader || {};
-  const syms = {}; ((await c.send(CT_PT.SYMBOLS, { ctidTraderAccountId: +ctid, includeArchivedSymbols: true })) || {}).symbol?.forEach(s => syms[s.symbolId] = s.symbolName);
-  // с какой даты: от последней синхронизации (с запасом 3 дня), иначе от последней сделки счёта, иначе от «Загружать с»
-  const existing = ctExisting(accId);
-  let from = CT.last[ctid] ? CT.last[ctid] - 3 * 864e5 : 0;
-  if (!from && existing.length) from = Math.max(...existing.map(t => new Date(t.closeTime || t.openTime).getTime()).filter(v => v > 0)) - 7 * 864e5;
-  if (!from) from = CT.fromStart !== false ? (+trader.registrationTimestamp || Date.now() - 3 * 365 * 864e5) : (CT.from ? Date.parse(CT.from + 'T00:00:00Z') : Date.now() - 90 * 864e5);
-  if (trader.registrationTimestamp) from = Math.max(from, +trader.registrationTimestamp);
-  const to = Date.now() - 1000, deals = [];
-  const WEEK = 7 * 864e5;
-  for (let a = from; a < to; a += WEEK) {
-    if (report) report('счёт ' + esc(acc.name) + ': загружаю сделки с ' + dFull(new Date(a).toISOString()) + '…');
-    await ctDeals(c, ctid, a, Math.min(to, a + WEEK - 1), deals, report);
-  }
+let CT_STOP = false;
+function ctStop() { CT_STOP = true; ctStatus('<span class="warn">Останавливаю… загруженное сохранено, продолжить можно кнопкой «Синхронизировать».</span>'); }
+/* из сделок cTrader — строки дневника (закрытия), с открывающей сделкой и размером лота */
+async function ctBuildRows(c, ctid, deals, syms) {
   const ok = deals.filter(d => d.dealStatus === undefined || d.dealStatus === 2 || d.dealStatus === 3 || d.dealStatus === 'FILLED' || d.dealStatus === 'PARTIALLY_FILLED');
   const opens = {}, closes = [];
   ok.forEach(d => { if (d.closePositionDetail) closes.push(d); else { const o = opens[d.positionId]; if (!o || +d.executionTimestamp < +o.executionTimestamp) opens[d.positionId] = d; } });
-  // позиции, открытые раньше окна загрузки — берём их открывающую сделку отдельно
   const miss = [...new Set(closes.filter(d => !opens[d.positionId]).map(d => d.positionId))];
-  for (const pid of miss.slice(0, 200)) {
+  for (const pid of miss.slice(0, 300)) {
+    if (CT_STOP) break;
     try {
       const cl = closes.find(d => d.positionId === pid);
       const r = await c.send(CT_PT.DEALS_BY_POS, { ctidTraderAccountId: +ctid, positionId: +pid, fromTimestamp: Math.max(0, +cl.executionTimestamp - 6.9 * 864e5), toTimestamp: Math.min(Date.now() - 1000, +cl.executionTimestamp) });
@@ -5627,19 +5674,12 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
       await ctSleep(250);
     } catch (e) {}
   }
-  // размер лота по инструментам
   const ids = [...new Set(closes.map(d => +d.symbolId))], lot = {};
-  if (ids.length) {
-    try {
-      const r = await c.send(CT_PT.SYMBOL_BY_ID, { ctidTraderAccountId: +ctid, symbolId: ids });
-      (r.symbol || []).concat(r.archivedSymbol || []).forEach(s => { if (s.lotSize) lot[s.symbolId] = +s.lotSize; });
-    } catch (e) {}
-  }
-  const rows = closes.sort((x, y) => +x.executionTimestamp - +y.executionTimestamp).map(d => {
+  if (ids.length) { try { const r = await c.send(CT_PT.SYMBOL_BY_ID, { ctidTraderAccountId: +ctid, symbolId: ids });
+    (r.symbol || []).concat(r.archivedSymbol || []).forEach(sy => { if (sy.lotSize) lot[sy.symbolId] = +sy.lotSize; }); } catch (e) {} }
+  return closes.sort((x, y) => (+x.executionTimestamp - +y.executionTimestamp) || (+x.dealId - +y.dealId)).map(d => {
     const cp = d.closePositionDetail, md = cp.moneyDigits != null ? cp.moneyDigits : (d.moneyDigits != null ? d.moneyDigits : 2);
-    const o = opens[d.positionId];
-    const vol = cp.closedVolume != null ? +cp.closedVolume : +d.filledVolume;
-    const ls = lot[+d.symbolId];
+    const o = opens[d.positionId], vol = cp.closedVolume != null ? +cp.closedVolume : +d.filledVolume, ls = lot[+d.symbolId];
     const gross = ctNum(cp.grossProfit, md), sw = ctNum(cp.swap, md), com = ctNum(cp.commission, md), fee = ctNum(cp.pnlConversionFee, md) || 0;
     const rec = {
       id: uid(), posId: String(d.positionId), dealId: String(d.dealId), orderId: d.orderId != null ? String(d.orderId) : null,
@@ -5647,31 +5687,70 @@ async function ctSyncAccount(c, tk, ctid, accId, report) {
       symbol: String(syms[d.symbolId] || ('#' + d.symbolId)).replace(/[\/\s]/g, '').toUpperCase(),
       side: o ? (ctIsSell(o.tradeSide) ? 'sell' : 'buy') : (ctIsSell(d.tradeSide) ? 'buy' : 'sell'),
       volume: ls ? Math.round(vol / ls * 100) / 100 : Math.round(vol / 100) / 100,
-      openTime: ctWall(o ? +o.executionTimestamp : +d.executionTimestamp),
-      closeTime: ctWall(+d.executionTimestamp),
+      openTime: ctWall(o ? +o.executionTimestamp : +d.executionTimestamp), closeTime: ctWall(+d.executionTimestamp),
       openPrice: cp.entryPrice != null ? +cp.entryPrice : (o && o.executionPrice != null ? +o.executionPrice : null),
-      closePrice: d.executionPrice != null ? +d.executionPrice : null,
-      sl: null, tp: null, pips: null,
-      commission: com, swap: sw, net: Math.round(((gross || 0) + (sw || 0) + (com || 0) + fee) * 100) / 100,
-      balAfter: ctNum(cp.balance, md),
-      riskPct: null, setup: d.comment || '', tps: [], tf: '', emotion: '', reason: '', review: '', rating: '',
-      mistakes: [], tags: [], shots: [], created: Date.now()
+      closePrice: d.executionPrice != null ? +d.executionPrice : null, sl: null, tp: null, pips: null,
+      commission: com, swap: sw, net: Math.round(((gross || 0) + (sw || 0) + (com || 0) + fee) * 100) / 100, balAfter: ctNum(cp.balance, md),
+      riskPct: null, setup: d.comment || '', tps: [], tf: '', emotion: '', reason: '', review: '', rating: '', mistakes: [], tags: [], shots: [], created: Date.now()
     };
     rec.impKey = 'p' + rec.posId;
     return rec;
   });
-  const fresh = ctFreshRows(rows, existing);
+}
+function ctSaveRows(accId, rows) {
+  const existing = ctExisting(accId), fresh = ctFreshRows(rows, existing);
   if (fresh.length) {
     if (accId === S.id) { TR = TR.concat(fresh); save(); }
     else { localStorage.setItem(TKEY(accId), JSON.stringify(existing.concat(fresh))); ACC_IDX = null; markDirty(); }
   }
+  return fresh.length;
+}
+async function ctSyncAccount(c, tk, ctid, accId, report) {
+  const acc = accById(accId); if (!acc) return { added: 0 };
+  try { await c.send(CT_PT.ACC_AUTH, { ctidTraderAccountId: +ctid, accessToken: tk.accessToken }); }
+  catch (e) { if (!/ALREADY/i.test(e.code || e.message)) throw e; }
+  const trader = ((await c.send(CT_PT.TRADER, { ctidTraderAccountId: +ctid })) || {}).trader || {};
+  const syms = {}; ((await c.send(CT_PT.SYMBOLS, { ctidTraderAccountId: +ctid, includeArchivedSymbols: true })) || {}).symbol?.forEach(sy => syms[sy.symbolId] = sy.symbolName);
+  CT.full = CT.full || {}; CT.resume = CT.resume || {};
+  const reg = +trader.registrationTimestamp || 0, existing = ctExisting(accId), full = !!CT.full[ctid];
+  // с какой даты: продолжение прерванной загрузки → вся история (по кнопке) → от последней синхронизации → от последней сделки → настройка
+  let from = CT.resume[ctid] || 0;
+  if (!from && full) from = CT.fromStart !== false ? (reg || Date.now() - 3 * 365 * 864e5) : (CT.from ? Date.parse(CT.from + 'T00:00:00Z') : Date.now() - 90 * 864e5);
+  if (!from && CT.last[ctid]) from = CT.last[ctid] - 3 * 864e5;
+  const exCt = existing.filter(t => t.src === 'ctrader');               // от последней сделки из cTrader (CSV и ручные не в счёт)
+  if (!from && exCt.length) from = Math.max(...exCt.map(t => new Date(t.closeTime || t.openTime).getTime()).filter(v => v > 0)) - 7 * 864e5;
+  if (!from) from = CT.fromStart !== false ? (reg || Date.now() - 3 * 365 * 864e5) : (CT.from ? Date.parse(CT.from + 'T00:00:00Z') : Date.now() - 90 * 864e5);
+  if (reg) from = Math.max(from, reg);
+  const start = from, to = Date.now() - 1000, CHUNK = 28 * 864e5;
+  let added = 0, seen = 0, step = 7 * 864e5;
+  for (let a = from; a < to && !CT_STOP; ) {
+    const chunkEnd = Math.min(to, a + CHUNK), deals = [];
+    let w = a;
+    for (; w < chunkEnd && !CT_STOP; ) {
+      const we = Math.min(chunkEnd, w + step), before = deals.length;
+      const pr = Math.round((w - start) / Math.max(1, to - start) * 100);
+      if (report) report('счёт <b>' + esc(acc.name) + '</b>: ' + dFull(new Date(w).toISOString()) + ' · ' + pr + '% · найдено закрытий: ' + (seen + deals.filter(d => d.closePositionDetail).length));
+      await ctDeals(c, ctid, w, we - 1, deals, report);
+      const got = deals.length - before;                       // плотные недели — дробим окно, чтобы ответы были небольшими
+      step = got > 600 ? 864e5 : got > 250 ? 2 * 864e5 : 7 * 864e5;
+      if (!CT_STOP) w = we;                                    // остановили посреди окна — его загрузим заново
+    }
+    if (CT_STOP && !deals.length) break;
+    const rows = await ctBuildRows(c, ctid, deals, syms);
+    seen += rows.length; added += ctSaveRows(accId, rows);
+    a = CT_STOP ? w : chunkEnd;                                // продолжение — ровно с того места, где остановились
+    if (a < to) { CT.resume[ctid] = a; saveCT(); }
+  }
+  if (CT_STOP) { saveCT(); return { added, enriched: 0, seen, balance: null, acc, stopped: true }; }
+  delete CT.resume[ctid]; delete CT.full[ctid];
+  const fresh = { length: added };
   try { await ctCashFlow(c, ctid, accId, trader, report); } catch (e) { /* без истории денег — просто сверка */ }
   try { ctBalanceChain(accId); } catch (e) {}
   const enr = await ctEnrich(c, ctid, accId, report);
   CT.last[ctid] = Date.now();
   if (trader.balance != null) { CT.bal = CT.bal || {}; CT.bal[ctid] = { bal: ctNum(trader.balance, trader.moneyDigits), at: Date.now() }; }
   saveCT();
-  return { added: fresh.length, enriched: enr, seen: rows.length, balance: trader.balance != null ? ctNum(trader.balance, trader.moneyDigits) : null, acc };
+  return { added, enriched: enr, seen, balance: trader.balance != null ? ctNum(trader.balance, trader.moneyDigits) : null, acc };
 }
 /* пополнения, выводы, выплаты: не сделки — хранятся отдельно и не смешиваются с результатом торговли */
 async function ctCashFlow(c, ctid, accId, trader, report) {
@@ -5748,7 +5827,8 @@ function ctFit(ctid) {
 }
 async function ctReloadAll() {
   if (!confirm('Загрузить всю историю с открытия каждого привязанного счёта, включая пополнения и выводы?\n\nДубли не появятся — уже загруженные сделки пропускаются. Займёт несколько минут.')) return;
-  CT.fromStart = true; Object.keys(CT.links || {}).forEach(k => { delete CT.last[k]; if (CT.cashLast) delete CT.cashLast[k]; });
+  CT.fromStart = true; CT.full = CT.full || {}; CT.resume = CT.resume || {};
+  Object.keys(CT.links || {}).forEach(k => { delete CT.last[k]; if (CT.cashLast) delete CT.cashLast[k]; CT.full[k] = true; delete CT.resume[k]; });
   Object.values(CT.links || {}).forEach(id => { const a = accById(id); if (a) a.balSrc = a.balSrc === 'fit' ? '' : a.balSrc; });
   saveCT(); ctSync();
 }
@@ -5759,7 +5839,8 @@ async function ctSync(quiet) {
   if (!ctReady()) { if (!quiet) ctStatus('<span class="dn">Сначала нажми «Подключить cTrader»</span>'); return; }
   ctBusy = true; $$('.ctSyncBtn').forEach(b => b.disabled = true);
   CT_EMPTY = 0; CT_ERR = '';
-  const rep = h => ctStatus('<span class="mut">' + h + '</span>');
+  CT_STOP = false;
+  const rep = h => ctStatus('<span class="mut">' + h + '</span> <button class="btn sm" onclick="ctStop()">Остановить</button>');
   rep('Подключаюсь к cTrader…');
   const res = []; let c = null, cLive = null;
   try {
@@ -5768,9 +5849,11 @@ async function ctSync(quiet) {
       const a = CT.accounts.find(x => x.ctid === ctid) || { live: true };
       if (!c || cLive !== a.live) { if (c) c.close(); c = await ctSession(a.live, tk); cLive = a.live; }
       res.push(await ctSyncAccount(c, tk, ctid, CT.links[ctid], rep));
+      if (CT_STOP) break;
     }
     const added = res.reduce((s, r) => s + r.added, 0);
     renderAll();
+    if (CT_STOP) { ctStatus('<span class="warn">Загрузка остановлена.</span> Добавлено сделок: ' + added + '. Нажми «Синхронизировать» — продолжит с того же места.'); return; }
     const enr = res.reduce((s, r) => s + (r.enriched || 0), 0);
     const msg = (enr ? 'Стопы и тейки уточнены у ' + enr + ' сделок. ' : '') + (CT_EMPTY ? 'У ' + CT_EMPTY + ' позиций cTrader не вернул ордера. ' : '') + (CT_ERR ? 'Ошибка при чтении ордеров: ' + CT_ERR + '. ' : '') + (added ? 'Из cTrader добавлено сделок: ' + added + ' (' + res.filter(r => r.added).map(r => r.acc.name + ' +' + r.added).join(', ') + ')' : 'Новых сделок в cTrader нет — всё уже в дневнике');
     ctStatus('<span class="up">' + esc(msg) + '</span><br><span class="mut">Синхронизировано ' + dt(ctWall(Date.now())) +
@@ -6653,6 +6736,7 @@ function fillSettings() {
   $('#sSetups').value = S.setups.join(', '); $('#sTags').value = S.tags.join(', '); $('#sMistakes').value = S.mistakes.join(', ');
   let bytes = 0;
   for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('fxj.')) bytes += new Blob([localStorage.getItem(k)]).size; }
+  if (window.FXJ_STORE) bytes += window.FXJ_STORE.bytes();
   fillQuotes(); fillGd(); fillCT();
   const kbBytes = KB.reduce((s, f) => s + (f.size || 0), 0);
   $('#storeInfo').innerHTML = 'Счетов: ' + ACC.accounts.length + ' · сделок на активном: ' + TR.length +
@@ -8283,7 +8367,7 @@ setTimeout(() => { dscApply(); dscPull(true); }, 1500);
 window.DSC_READY = true;
 setTimeout(() => (gMode() ? gToken().catch(() => {}) : Promise.resolve()).then(() => gdReady() ? Promise.resolve(gdPull(true)).catch(() => {}) : 0).then(() => { if (CT.auto !== false && Object.keys(CT.links || {}).length && ctReady()) ctSync(true); }), 1200);
 </script>
-<script>
+<script type="text/fxj">
 /* боковая панель по группам и линейные иконки */
 (function () {
   const nav = document.getElementById('nav'); if (!nav) return;
@@ -8311,7 +8395,7 @@ setTimeout(() => (gMode() ? gToken().catch(() => {}) : Promise.resolve()).then((
 })();
 
 </script>
-<script>
+<script type="text/fxj">
 /* переключатель темы «Тёмная / Светлая / Авто»; в светлой теме тёмные цвета графиков меняются на светлые */
 (function () {
   const MAP = { '#232c38': '#e5e5ea', '#161b22': '#ffffff', '#30363d': '#d1d1d6', '#3d4b5c': '#c7c7cc', '#3d444d': '#d1d1d6', '#c9d1d9': '#3a3a3c', '#8b98a8': '#6e6e73', '#5c6a7a': '#8e8e93', '#8b949e': '#6e6e73' };
