@@ -383,6 +383,7 @@ input[type=range]{accent-color:var(--acc);padding:0;height:26px}
 #jTotals tbody tr:last-child{background:var(--bg3);font-weight:600}
 .tip{position:absolute;background:#1c242e;border:1px solid #3a4756;padding:8px 11px;border-radius:9px;font-size:12px;line-height:1.5;z-index:120;pointer-events:none;opacity:0;transition:opacity .1s;box-shadow:0 8px 24px rgba(0,0,0,.55);white-space:nowrap;left:0;top:0}
 .tip.on{opacity:1}
+.tip:not(.on){left:0!important;top:0!important;visibility:hidden}  /* спрятанная подсказка не должна растягивать страницу вниз */
 .tip.wide{white-space:normal;max-width:340px;line-height:1.55}
 canvas{cursor:crosshair}
 .tprow{display:grid;grid-template-columns:1fr 92px auto auto;gap:8px;align-items:center;margin-bottom:7px}
@@ -7986,6 +7987,7 @@ function jView(v) {
   if (v === 'help') renderHelp();
 }
 function go(p) {
+  const tp = document.getElementById('tip'); if (tp) tp.classList.remove('on', 'wide');
   const changed = currentPage !== p;
   currentPage = p;
   $$('.pwbox input').forEach(i => i.type = 'password'); $$('.pwbtn').forEach(b => b.classList.remove('on'));
