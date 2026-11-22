@@ -864,6 +864,11 @@ body.light ::-webkit-scrollbar-thumb{background:#c7c7cc}
 .thsw span{flex:1;text-align:center;font-size:11.5px;padding:4px 0;border-radius:7px;color:#a1a1a6;cursor:pointer;user-select:none}
 .thsw span.on{background:#636366;color:#fff}
 body.light .thsw{background:#e9e9ee}body.light .thsw span{color:#6e6e73}body.light .thsw span.on{background:#fff;color:#000;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+
+.gsw{flex:0 0 auto;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--tx3)}
+.gsw.loud{background:rgba(255,159,10,.14);color:var(--tx);padding:10px 14px}
+.gsw-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.gsw-how{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bg);color:var(--tx);font-size:13px;line-height:1.55}.gsw-how ol{margin:6px 0 6px 18px;padding:0}.gsw-how li{margin:2px 0}
 </style>
 </head>
 <body>
@@ -1674,6 +1679,7 @@ body.light .thsw{background:#e9e9ee}body.light .thsw span{color:#6e6e73}body.lig
         <button class="x" onclick="gsClose()">×</button>
       </div>
     </div>
+    <div id="gsWarn" class="gsw" style="display:none"></div>
     <div class="kbbody" style="background:#fff"><iframe id="gsFrame" title="Google Таблица" allow="clipboard-read; clipboard-write" style="width:100%;height:100%;border:none;display:block"></iframe></div>
   </div>
 </div>
@@ -5616,9 +5622,33 @@ function gsOpen(id) {
   gsCurId = id;
   $('#gsTitle').textContent = f.name || 'Таблица';
   $('#gsFrame').src = gsEditUrl(id);
+  gsWarnOpen = false; gsWarn();
   $('#gsMask').classList.add('on');
 }
 function gsOpenTab() { if (gsCurId) window.open(gsEditUrl(gsCurId), '_blank', 'noopener'); }
+/* Если браузер не пускает Google внутрь Дневника (Safari, запрет сторонних cookie) — встроенная таблица показывает
+   «Нет доступа к аккаунту Google». Прочитать содержимое чужого окна нельзя, поэтому подсказка зависит от браузера:
+   в Safari — заметная сразу, в остальных — тихая строка с той же кнопкой. */
+const GS_SAFARI = /^((?!chrome|chromium|crios|fxios|edg|opr|android).)*safari/i.test(navigator.userAgent);
+const GS_APP = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+let gsWarnOpen = false;
+function gsWarn() {
+  const box = $('#gsWarn'); if (!box) return;
+  const loud = GS_SAFARI && localStorage.getItem('fxj.gsWarnOff') !== '1';
+  const how = gsWarnOpen ? '<div class="gsw-how"><b>Чтобы таблицы открывались прямо в Дневнике:</b><ol>' +
+    '<li>Открой Дневник в <b>Google Chrome</b> и войди в Chrome тем же Google-аккаунтом, что и в Дневник.</li>' +
+    '<li>Меню ⋮ → «Сохранить и поделиться» → «Установить страницу как приложение».</li>' +
+    '<li>В новом приложении войди в Дневник через Google — данные подтянутся с Диска. Старое приложение из Safari можно убрать из Dock.</li></ol>' +
+    '<span class="mut">Либо в браузере: разреши сторонние cookie для docs.google.com и войди в Google на google.com тем же аккаунтом. «Открыть в новой вкладке» работает всегда — правки сохраняются в тот же файл.</span></div>' : '';
+  box.className = 'gsw' + (loud ? ' loud' : '');
+  box.innerHTML = '<div class="gsw-row"><span>' + (loud
+      ? '<b>' + (GS_APP ? 'Приложение из Safari' : 'Safari') + ' не пускает Google внутрь Дневника.</b> Если ниже «Нет доступа к аккаунту Google» — открой таблицу в новой вкладке.'
+      : 'Вместо таблицы «Нет доступа к аккаунту Google»? Браузер не пускает Google внутрь Дневника.') + '</span>' +
+    '<span class="row" style="gap:6px;flex:0 0 auto"><button class="btn sm pri" onclick="gsOpenTab()">Открыть в новой вкладке ↗</button>' +
+    '<button class="btn sm" onclick="gsWarnOpen=!gsWarnOpen;gsWarn()">' + (gsWarnOpen ? 'Скрыть' : 'Как исправить') + '</button>' +
+    (loud ? '<button class="btn sm" title="Больше не показывать крупно" onclick="localStorage.setItem(\'fxj.gsWarnOff\',\'1\');gsWarn()">×</button>' : '') + '</span></div>' + how;
+  box.style.display = '';
+}
 function gsClose() { $('#gsMask').classList.remove('on'); $('#gsFrame').src = 'about:blank'; gsCurId = null; gsRefresh(true); }
 
 
