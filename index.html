@@ -8283,13 +8283,22 @@ async function installApp() {
 }
 appInfo();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('sw.js').then(reg => {
-    reg.addEventListener('updatefound', () => {
-      const w = reg.installing;
-      if (w) w.addEventListener('statechange', () => {
-        if (w.state === 'installed' && navigator.serviceWorker.controller) toast('Вышла новая версия дневника — перезапусти приложение');
-      });
-    });
+  /* новая версия: тихо перезагружаемся сами, но только когда ничего не пишешь и не открыто окно сделки */
+  const swHad = !!navigator.serviceWorker.controller; let swPend = false, swDone = false;
+  const swBusy = () => { const a = document.activeElement;
+    return !!(a && (/^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName) || a.isContentEditable)) || !!document.querySelector('.mask.on') ||
+      (typeof gdBusy !== 'undefined' && gdBusy) || (typeof ctBusy !== 'undefined' && ctBusy); };
+  const swTry = () => { if (!swPend || swDone || swBusy()) return; swDone = true;
+    try { window.FXJ_STORE && FXJ_STORE.flush(); } catch (e) {}
+    toast('Дневник обновился — перезапуск…'); setTimeout(() => location.reload(), 900); };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!swHad) return; swPend = true; swTry(); });
+  document.addEventListener('focusout', () => setTimeout(swTry, 400));
+  document.addEventListener('click', () => setTimeout(swTry, 400));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) swTry(); });
+  setInterval(swTry, 15000);
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    setInterval(() => { if (!document.hidden) reg.update().catch(() => {}); }, 30 * 60000);
   }).catch(() => {});
 }
 /* хранилище браузера не должно чиститься само */
