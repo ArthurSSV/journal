@@ -8423,8 +8423,8 @@ async function dscPull(force) {
   updNavTeam(); dscApply();
 }
 /* ---------- формы чек-листов ---------- */
-function dscForm(id, qs) {
-  return '<div class="dscform" id="' + id + '">' + qs.map((q, i) => /:\s*$/.test(q)
+function dscForm(id, qs, date) {
+  return '<div class="dscform" id="' + id + '" data-dk="' + id + '@' + (date || dscToday()) + '">' + qs.map((q, i) => /:\s*$/.test(q)
     ? '<div class="field"><label>' + esc(q.replace(/:\s*$/, '')) + '</label><textarea data-i="' + i + '" rows="2"></textarea></div>'
     : '<label class="chk"><input type="checkbox" data-i="' + i + '">' + esc(q) + '</label>').join('') + '<div class="dn" style="font-size:12px;min-height:16px;margin:4px 0" data-err></div></div>';
 }
@@ -8443,7 +8443,8 @@ async function dscSubmit(kind, date) {
   if (kind === 'evening') { const w = $$('#dsc_wins input').map(x => x.value.trim()).filter(Boolean); if (w.length) d.wins = w; else delete d.wins; }
   saveDSC(); markDirty();
   if (dscSrv()) { try { await dscCall('/d/day/put', { date, patch: { [kind]: true, log: kind === 'morning' ? 'Утренний чек-лист заполнен' : 'Разбор дня ' + date.split('-').reverse().join('.') + ' заполнен' } }); } catch (e) { toast('Сохранено на устройстве, сервер недоступен'); } }
-  toast(kind === 'morning' ? 'Чек-лист заполнен' : 'Разбор дня сохранён'); dscApply(); renderDisc();
+  dscDraftClear('dsc_' + kind + '@' + date); if (kind === 'evening') dscDraftClear('wins@' + date);
+  toast(kind === 'morning' ? 'Чек-лист заполнен' : 'Разбор дня сохранён'); dscApply(); renderDisc(true);
 }
 async function dscReentry(accId) {
   const cfg = dscCfg(), ans = dscRead('dsc_re_' + accId, cfg.reentry, 15); if (!ans) return;
@@ -8451,12 +8452,31 @@ async function dscReentry(accId) {
   d.re = (d.re || []).concat([{ acc: accId, at: Date.now(), until: Date.now() + pause * 60000, ans }]); saveDSC(); markDirty();
   const a = accById(accId) || {};
   if (dscSrv()) { try { const j = await dscCall('/d/day/put', { date: dscToday(), patch: { re: { acc: accId, pause, ans }, log: 'Повторный допуск: «' + (a.name || '') + '»' + (pause ? ', пауза ' + pause + ' мин' : '') } }); if (j.day && j.day.re) d.re = j.day.re; saveDSC(); } catch (e) {} }
-  dscReOpen = '';
-  toast(pause ? 'Повторный допуск через ' + pause + ' мин' : 'Повторный допуск выдан'); dscApply(); renderDisc();
+  dscReOpen = ''; dscDraftClear('dsc_re_' + accId + '@' + dscToday());
+  toast(pause ? 'Повторный допуск через ' + pause + ' мин' : 'Повторный допуск выдан'); dscApply(); renderDisc(true);
 }
 let dscReOpen = '';
-function renderDisc() {
+/* черновики форм допуска: текст не пропадает при автообновлении экрана и перезагрузке */
+const LS_DSCDRAFT = 'fxj.dscdraft.v1';
+let DSC_DRAFT = {}, dscDraftT = 0, dscRenderPending = false;
+try { DSC_DRAFT = JSON.parse(localStorage.getItem(LS_DSCDRAFT)) || {}; } catch (e) {}
+(function () { const old = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
+  Object.keys(DSC_DRAFT).forEach(k => { const m = k.match(/@(\d{4}-\d\d-\d\d)\|/); if (m && m[1] < old) delete DSC_DRAFT[k]; }); })();
+function dscDraftSave() { clearTimeout(dscDraftT); dscDraftT = setTimeout(() => { try { localStorage.setItem(LS_DSCDRAFT, JSON.stringify(DSC_DRAFT)); } catch (e) {} }, 300); }
+function dscDraftClear(prefix) { Object.keys(DSC_DRAFT).forEach(k => { if (k.indexOf(prefix + '|') === 0) delete DSC_DRAFT[k]; }); dscDraftSave(); }
+function dscFKey(el) {
+  const f = el.closest && el.closest('[data-dk]'); if (f) { const i = el.dataset.i != null ? 'i' + el.dataset.i : el.dataset.w != null ? 'w' + el.dataset.w : ''; return i ? f.dataset.dk + '|' + i : ''; }
+  return el.id === 'dscCode' ? 'code|' : '';
+}
+function dscTyping() { const a = document.activeElement, box = $('#discBody'); return !!(a && box && box.contains(a) && /^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)); }
+document.addEventListener('input', e => { const t = e.target; if (!t.closest || !t.closest('#discBody')) return; const k = dscFKey(t); if (!k) return; DSC_DRAFT[k] = t.type === 'checkbox' ? t.checked : t.value; dscDraftSave(); });
+document.addEventListener('change', e => { const t = e.target; if (t.type !== 'checkbox' || !t.closest || !t.closest('#discBody')) return; const k = dscFKey(t); if (k) { DSC_DRAFT[k] = t.checked; dscDraftSave(); } });
+document.addEventListener('focusout', e => { if (!dscRenderPending || !e.target.closest || !e.target.closest('#discBody')) return;
+  setTimeout(() => { if (dscRenderPending && !dscTyping() && currentPage === 'disc') renderDisc(); }, 250); });
+function renderDisc(force) {
   const box = $('#discBody'); if (!box) return;
+  if (!force && dscTyping()) { dscRenderPending = true; return; }       // пока пишешь — экран не перерисовываем
+  dscRenderPending = false;
   const r = dscEval(), cfg = dscCfg(), today = dscToday(), d = dscDay(today), team = dscTeam();
   let h = '';
   if (!dscActive()) {
@@ -8468,7 +8488,7 @@ function renderDisc() {
     h += '<div class="dscgate ' + (r.code === 'goal' ? 'ok' : cl) + '" style="margin-bottom:14px"><h2>' + (r.code === 'goal' ? '★ Цель дня выполнена' : r.code === 'ok' ? '✓ Допуск есть' : esc(r.text.split(':')[0])) + '</h2><p>' + esc(r.text) + '</p></div>' + goalsPlaque() + wdgHtml(false) + nbTodayCard();
     if (r.evDate && r.code === 'evening')
       h += '<div class="card" style="margin-bottom:14px"><h2>Разбор дня ' + dFull(r.evDate + 'T00:00:00Z') + '</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Без разбора прошлого торгового дня сегодняшний чек-лист не откроется.</p>' +
-        goalsPlanFact(r.evDate) + dscForm('dsc_evening', cfg.evening) + winsForm(r.evDate) + '<button class="btn pri" onclick="dscSubmit(\'evening\',\'' + r.evDate + '\')">Сохранить разбор</button></div>';
+        goalsPlanFact(r.evDate) + dscForm('dsc_evening', cfg.evening, r.evDate) + winsForm(r.evDate) + '<button class="btn pri" onclick="dscSubmit(\'evening\',\'' + r.evDate + '\')">Сохранить разбор</button></div>';
     else if (!d.morning && r.code === 'morning')
       h += '<div class="card" style="margin-bottom:14px"><h2>Утренний чек-лист</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Отметь все пункты и запиши план — после этого откроется допуск.</p>' +
         dscForm('dsc_morning', cfg.morning) + '<button class="btn pri" onclick="dscSubmit(\'morning\',\'' + today + '\')">Получить допуск</button></div>';
@@ -8481,7 +8501,7 @@ function renderDisc() {
           dscForm('dsc_re_' + a.id, cfg.reentry) + '<button class="btn pri" onclick="dscReentry(\'' + a.id + '\')">Отправить и вернуться</button></div>' : '')
     ).join('') + '</div></div>';
     if (d.morning && !d.evening && r.accs.some(a => a.n))
-      h += '<div class="card" style="margin-bottom:14px"><h2>Разбор сегодняшнего дня</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Сделай вечером — тогда завтра утром сразу откроется чек-лист.</p>' + goalsPlanFact(today) + dscForm('dsc_evening', cfg.evening) + winsForm(today) +
+      h += '<div class="card" style="margin-bottom:14px"><h2>Разбор сегодняшнего дня</h2><p class="mut" style="font-size:12px;margin:4px 0 10px">Сделай вечером — тогда завтра утром сразу откроется чек-лист.</p>' + goalsPlanFact(today) + dscForm('dsc_evening', cfg.evening, today) + winsForm(today) +
         '<button class="btn" onclick="dscSubmit(\'evening\',\'' + today + '\')">Сохранить разбор</button></div>';
     h += winsCard();
     const log = (d.log || []).slice().reverse();
@@ -8494,6 +8514,7 @@ function renderDisc() {
   if (dscActive() && !team) h += '<div style="margin-top:12px"><button class="btn sm" onclick="dscEnable(false)">Выключить режим допуска</button></div>';
   h += '</div>';
   box.innerHTML = h;
+  box.querySelectorAll('input,textarea').forEach(el => { const k = dscFKey(el); if (!k || !(k in DSC_DRAFT)) return; if (el.type === 'checkbox') el.checked = !!DSC_DRAFT[k]; else el.value = DSC_DRAFT[k]; });
 }
 
 function wdgHtml(compact) {
@@ -8505,7 +8526,7 @@ function wdgHtml(compact) {
 function winsForm(date) {
   const cur = ((DSC.days[date] || {}).wins) || [];
   const ph = ['Не вошёл без сигнала, хотя хотелось', 'Соблюдал риск во всех сделках', 'Закрыл по плану, не двигал стоп', 'Сделал разбор сразу после сессии', 'Остановился вовремя'];
-  return '<div class="wins-f" id="dsc_wins"><div class="wins-h"><b>5 успехов дня</b><span class="mut">по желанию · успех — это и дисциплина, не только прибыль</span></div>' +
+  return '<div class="wins-f" id="dsc_wins" data-dk="wins@' + date + '"><div class="wins-h"><b>5 успехов дня</b><span class="mut">по желанию · успех — это и дисциплина, не только прибыль</span></div>' +
     [0, 1, 2, 3, 4].map(i => '<div class="wins-i"><span>' + (i + 1) + '</span><input data-w="' + i + '" value="' + esc(cur[i] || '') + '" placeholder="' + ph[i] + '"></div>').join('') + '</div>';
 }
 function winsStats() {
